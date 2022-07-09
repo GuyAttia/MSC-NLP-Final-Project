@@ -1,5 +1,5 @@
 # Create the image base on the Miniconda3 image
-FROM python:3.8-slim
+FROM python:3.6-slim
 
 # Creating the working directory in the container
 WORKDIR /nlp
