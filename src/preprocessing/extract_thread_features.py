@@ -68,7 +68,7 @@ def extract_thread_features(conversation):
     feature_dict['wordcount'] = len(nltk.word_tokenize(re.sub(r'([^\s\w]|_)+',
                                                               '', tw['text'].lower())))
     swearwords = []
-    with open('preprocessing/data/badwords.txt', 'r') as f:
+    with open('src/preprocessing/data/badwords.txt', 'r') as f:
         for line in f:
             swearwords.append(line.strip().lower())
     feature_dict['hasswearwords'] = 0
@@ -323,7 +323,7 @@ def extract_thread_features_incl_response(conversation):
             '',
             tw['text'].lower())))
         swearwords = []
-        with open('preprocessing/data/badwords.txt', 'r') as f:
+        with open('src/preprocessing/data/badwords.txt', 'r') as f:
             for line in f:
                 swearwords.append(line.strip().lower())
         feature_dict['hasswearwords'] = 0

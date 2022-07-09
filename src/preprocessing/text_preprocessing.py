@@ -104,7 +104,7 @@ validDEPS = ['UNK',
              'xcomp']
 
 
-def preprocess_text(text: str, opts, nlpengine=None, lang='en', special_tags=["<pad>", "<eos>"],
+def preprocess_text(text: str, opts, nlpengine=None, lang='en_core_web_sm', special_tags=["<pad>", "<eos>"],
                     use_tw_preprocessor=True):
     if use_tw_preprocessor:
         ## ! There is a bug in original package for twitter preprocessing
@@ -119,7 +119,7 @@ def preprocess_text(text: str, opts, nlpengine=None, lang='en', special_tags=["<
         global nlp
         if nlp is None:
             nlp = spacy.load(lang)
-            nlp.add_pipe(nlp.create_pipe('sentencizer'))
+            nlp.add_pipe('sentencizer')
             for x in ['URL', 'MENTION', 'HASHTAG', 'RESERVED', 'EMOJI', 'SMILEY', 'NUMBER', ]:
                 nlp.tokenizer.add_special_case(f'${x}$', [{ORTH: f'${x}$'}])
         nlpengine = nlp

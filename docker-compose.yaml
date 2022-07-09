@@ -11,4 +11,4 @@ services:
     # ports:
       # - "8888:8888"
     # command: jupyter notebook --no-browser --ip='*' --port=8888 --allow-root --NotebookApp.token='' --NotebookApp.password=''
-    command: sleep infinitly
+    command: sleep infinity
