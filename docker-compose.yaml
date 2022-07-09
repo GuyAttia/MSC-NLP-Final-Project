@@ -5,10 +5,9 @@ services:
     image: nlp-project:latest
     build: .
     volumes:
-      - "./data:/nlp/data"
-      - "./notebooks:/nlp/notebooks"
-      - "./src:/nlp/src"
-    # ports:
-      # - "8888:8888"
-    # command: jupyter notebook --no-browser --ip='*' --port=8888 --allow-root --NotebookApp.token='' --NotebookApp.password=''
+      # - "./data:/nlp/data"
+      # - "./data_preprocessing:/nlp/data_preprocessing"
+      # - "./notebooks:/nlp/notebooks"
+      # - "./src:/nlp/src"
+      - ".:."
     command: sleep infinity
