@@ -5,9 +5,8 @@ services:
     image: nlp-project:latest
     build: .
     volumes:
-      # - "./data:/nlp/data"
-      # - "./data_preprocessing:/nlp/data_preprocessing"
-      # - "./notebooks:/nlp/notebooks"
-      # - "./src:/nlp/src"
-      - ".:."
+      - "./data:/nlp/data"
+      - "./data_preprocessing:/nlp/data_preprocessing"
+      - "./notebooks:/nlp/notebooks"
+      - "./src:/nlp/src"
     command: sleep infinity
