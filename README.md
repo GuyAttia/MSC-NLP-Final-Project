@@ -11,13 +11,21 @@ We formulate the problem as a stance classification, determining the rumour stan
 - Develop and run scripts inside the container
 
 ## Processing the original data into model's format and running the training
-- download en models for spacy `python -m spacy download en`
-- download data and change the paths accordingly, all paths can be changed in data_preprocessing/paths.py. run everything from root directory (so the working directory is root directory), set PYTHONPATH for root directory
-export PYTHONPATH=<your_project_root_directory>
-- Download nltk resources: `import nltk`
-    1. stop words: `nltk.download('stopwords')`
-    2. punkt: `nltk.download('punkt')`
-    3. averaged_perceptron_tagger: `nltk.download('averaged_perceptron_tagger')`
+** Notice - you need to run everything from root directory (so the working directory is root directory)
+- Download data into the "data" folder inside the root directory. The structure should be:
+    - data
+        - rumoureval-2019-test-data
+            - reddit-test-data
+            - twitter-en-test-data
+        - rumoureval-2019-training-data
+            - reddit-dev-data
+            - reddit-training-data
+            - twitter-english
+            - dev-key.json
+            - train-key.json
+        - final-eval-key.json
+
 - process data `python src/data_processing.py`
 The preprocessed data should be available in data_preprocessing/saved_data_RumEval2019
-- Then you should be able to run the model BERT_textonly `python src/solver.py`
+- Run our baseline model - BERT_textonly: `python src/run_model.py -m baseline`
+- Run our new model: `python src/run_model.py -m new`

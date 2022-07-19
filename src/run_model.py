@@ -23,7 +23,7 @@ def main(model='baseline'):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('-m', '--model', help='Rather running the baseline or new model', required=True, choices=['baseline', 'new'], default='baseline')
+    parser.add_argument('-m', '--model', help='Rather running the baseline or new model', required=False, choices=['baseline', 'new'], default='baseline')
 
     args = parser.parse_args()
     kwargs = vars(args)

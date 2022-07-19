@@ -12,3 +12,10 @@ RUN /usr/local/bin/python -m pip install --upgrade pip && \
 
 ENV PYTHONPATH=/nlp/src
 ENV PYTHONUNBUFFERED=1
+
+# Download en models for spacy
+RUN python -m spacy download en
+# Download nltk resources
+RUN python -c "import nltk; nltk.download('stopwords')"
+RUN python -c "import nltk; nltk.download('punkt')"
+RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger')"

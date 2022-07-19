@@ -11,7 +11,7 @@ from torch.nn.modules.loss import _Loss
 from torchtext.data import BucketIterator, Iterator
 from tqdm import tqdm
 from collections import defaultdict, Callable, Counter
-from neural_bag.modelutils import glorot_param_init
+from modeling.modelutils import glorot_param_init
 from datasets.rumour_eval_dataset_branches import RumourEval2019Dataset_Branches
 from utils.utils import count_parameters, get_timestamp
 

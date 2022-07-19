@@ -9,4 +9,5 @@ services:
       - "./data_preprocessing:/nlp/data_preprocessing"
       - "./notebooks:/nlp/notebooks"
       - "./src:/nlp/src"
+      - ".:/nlp"
     command: sleep infinity

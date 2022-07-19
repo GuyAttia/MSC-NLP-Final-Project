@@ -1,8 +1,8 @@
 from pytorch_pretrained_bert import BertModel
-from pytorch_pretrained_bert.modeling import PreTrainedBertModel
+from pytorch_pretrained_bert.modeling import BertPreTrainedModel
 from torch import nn
 
-class BertModelForStanceClassification(PreTrainedBertModel):
+class BertModelForStanceClassification(BertPreTrainedModel):
     """
         `input_ids`: a torch.LongTensor of shape [batch_siz, sequence_length]
         `token_type_ids`: an optional torch.LongTensor of shape [batch_size, sequence_length]
