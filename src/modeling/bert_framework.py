@@ -277,7 +277,10 @@ class BERT_Framework(Base_Framework):
 
         for i, batch in enumerate(dev_iter):
             pred_logits = model(batch)
+            if torch.any(batch.stance_label == -1, dim=0):
+                batch.stance_label = torch.zeros_like(batch.stance_label)
             loss = lossfunction(pred_logits, batch.stance_label)
+
             maxpreds, argmaxpreds = torch.max(F.softmax(pred_logits, -1), dim=1)
 
             # compute branch statistics
