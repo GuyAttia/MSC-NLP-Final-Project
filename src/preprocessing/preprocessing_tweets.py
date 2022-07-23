@@ -1,13 +1,14 @@
 import json
 import os
 
-from preprocessing.paths import TRAIN_DATA_PREFIX, PATH_TO_TEST_TWITTER
 from preprocessing.tree2branches import tree2branches
+
+TRAIN_DATA_PREFIX = "/nlp/data/rumoureval2019/rumoureval-2019-training-data"
+PATH_TO_TEST_TWITTER = "/nlp/data/rumoureval2019/rumoureval-2019-test-data/twitter-en-test-data"
 
 
 def load_true_labels():
     tweet_label_dict = {}
-    veracity_label_dict = {}
     path_dev = os.path.join(TRAIN_DATA_PREFIX, "dev-key.json")
     with open(path_dev, 'r') as f:
         dev_key = json.load(f)
@@ -16,16 +17,19 @@ def load_true_labels():
     with open(path_train, 'r') as f:
         train_key = json.load(f)
 
+    path_test = os.path.join("/nlp/data/rumoureval2019/rumoureval-2019-test-data", "test-key.json")
+    with open(path_test, 'r') as f:
+        test_key = json.load(f)
+
     tweet_label_dict['dev'] = dev_key['subtaskaenglish']
     tweet_label_dict['train'] = train_key['subtaskaenglish']
+    test_labels = test_key['subtaskaenglish']
 
-    veracity_label_dict['dev'] = dev_key['subtaskbenglish']
-    veracity_label_dict['train'] = train_key['subtaskbenglish']
-
-    return tweet_label_dict, veracity_label_dict
+    return tweet_label_dict, test_labels
 
 
 def load_test_data_twitter(set_path=PATH_TO_TEST_TWITTER):
+    _, test = load_true_labels()
     allconv = []
     train_dev_split = {}
     train_dev_split['dev'] = []
@@ -58,8 +62,8 @@ def load_test_data_twitter(set_path=PATH_TO_TEST_TWITTER):
                         for line in f:
                             tw = json.loads(line)
                             tw['used'] = 0
-
                             tw['set'] = flag
+                            tw['label'] = test[tw['id_str']]
                             tweets.append(tw)
                             if tw['text'] is None:
                                 print("Tweet has no text", tw['id'])
@@ -71,8 +75,8 @@ def load_test_data_twitter(set_path=PATH_TO_TEST_TWITTER):
                     for line in f:
                         src = json.loads(line)
                         src['used'] = 0
-                        scrcid = src['id_str']
                         src['set'] = flag
+                        src['label'] = test[src['id_str']]
 
                 conversation['source'] = src
                 if src['text'] is None:
@@ -102,8 +106,8 @@ def load_test_data_twitter(set_path=PATH_TO_TEST_TWITTER):
                     for line in f:
                         src = json.loads(line)
                         src['used'] = 0
-                        scrcid = src['id_str']
                         src['set'] = flag
+                        src['label'] = test[src['id_str']]
 
                 conversation['source'] = src
                 if src['text'] is None:
@@ -132,8 +136,8 @@ def load_test_data_twitter(set_path=PATH_TO_TEST_TWITTER):
 
 
 def load_dataset():
-    # Load labels and split for task A and task B
-    tweet_label_dict, veracity_label_dict = load_true_labels()
+    # Load labels
+    tweet_label_dict, _ = load_true_labels()
     dev = tweet_label_dict['dev']
     train = tweet_label_dict['train']
     dev_tweets = dev.keys()
@@ -150,7 +154,7 @@ def load_dataset():
     train_dev_split['train'] = []
     train_dev_split['test'] = []
     # iterate over all tweet groups [reffered to as 'folds'] - charliehebdo etc...
-    for nfold, fold in enumerate(folds):
+    for _, fold in enumerate(folds):
         path_to_tweets = os.path.join(path_to_folds, fold)
         tweet_data = sorted(os.listdir(path_to_tweets))
         newfolds = [i for i in tweet_data if i[0] != '.']
@@ -178,14 +182,12 @@ def load_dataset():
                             if replyid in dev_tweets:
                                 tw['set'] = 'dev'
                                 tw['label'] = dev[replyid]
-                                #                        train_dev_tweets['dev'].append(tw)
                                 if flag == 'train':
                                     print("The tree is split between sets", foldr)
                                 flag = 'dev'
                             elif replyid in train_tweets:
                                 tw['set'] = 'train'
                                 tw['label'] = train[replyid]
-                                #                        train_dev_tweets['train'].append(tw)
                                 if flag == 'dev':
                                     print("The tree is split between sets", foldr)
                                 flag = 'train'
@@ -207,7 +209,6 @@ def load_dataset():
                         src['label'] = tweet_label_dict[flag][scrcid]
 
                 conversation['source'] = src
-                conversation['veracity'] = veracity_label_dict[flag][scrcid]
                 if src['text'] is None:
                     print("Tweet has no text", src['id'])
                 path_struct = path_to_tweets + '/' + foldr + '/structure.json'
@@ -246,7 +247,6 @@ def load_dataset():
                         src['label'] = tweet_label_dict[flag][scrcid]
 
                 conversation['source'] = src
-                conversation['veracity'] = veracity_label_dict[flag][scrcid]
                 if src['text'] is None:
                     print("Tweet has no text", src['id'])
 

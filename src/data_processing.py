@@ -10,19 +10,18 @@ from preprocessing.preprocessing_tweets import load_dataset, load_test_data_twit
 from preprocessing.transform_feature_dict import transform_feature_dict
 
 
-def convert_label(label):
-    if label == "true":
-        return (0)
-    elif label == "false":
-        return (1)
-    elif label == "unverified":
-        return (2)
-    else:
-        print(label)
-
-
-def prep_pipeline(feature_set=['avgw2v']):
+def prep_pipeline():
     path = os.path.join('data_preprocessing', 'saved_data_RumEval2019')
+    feature_set = [
+        'issource',
+        'raw_text',
+        'spacy_processed_text',
+        'spacy_processed_BLvec',
+        'spacy_processed_POSvec',
+        'spacy_processed_DEPvec',
+        'spacy_processed_NERvec'
+    ]
+
     folds = {}
     folds = load_dataset()
 
@@ -48,7 +47,6 @@ def prep_pipeline(feature_set=['avgw2v']):
         # contains stance labels for all branches in all conversations
         # final shape conversations_count * BRANCH_COUNT for the conversation x BRANCH_len
         fold_stance_labels = []
-        fold_veracity_labels = []
         conv_ids = []
 
         all_fold_features = []
@@ -68,8 +66,6 @@ def prep_pipeline(feature_set=['avgw2v']):
 
             # build data for source tweet for veracity
             for i in range(len(thread_features_array)):
-                if fold != "test":
-                    fold_veracity_labels.append(convert_label(conversation['veracity']))
                 conv_ids.append(conversation['id'])
 
         # % 0 supp, 1 comm,2 deny, 3 query
@@ -95,9 +91,7 @@ def prep_pipeline(feature_set=['avgw2v']):
                         "id": cnt,
                         "branch_id": f"{fold_idx}.{idx}",
                         "tweet_id": tweet_ids_branch[idx],
-                        "stance_label": branch_labels[idx] if not fold == "test" else -1,
-                        "veracity_label": (fold_veracity_labels[fold_idx] if e[idx][
-                                                                                    "issource"] > 0 else -1) if not fold == "test" else -1,
+                        "stance_label": branch_labels[idx], # if not fold == "test" else -1,
                         "raw_text": e[idx]["raw_text"],
                         "raw_text_prev": e[idx - 1]["raw_text"] if idx - 1 > -1 else "",
                         "raw_text_src": e[0]["raw_text"] if idx - 1 > -1 else "",
@@ -118,18 +112,5 @@ def prep_pipeline(feature_set=['avgw2v']):
             json.dump(jsonformat, open(os.path.join(path_fold, f"{fold}.json"), "w"))
             
 
-def main():
-    features = [
-        'issource',
-        'raw_text',
-        'spacy_processed_text',
-        'spacy_processed_BLvec',
-        'spacy_processed_POSvec',
-        'spacy_processed_DEPvec',
-        'spacy_processed_NERvec'
-    ]
-    prep_pipeline(feature_set=features)
-
-
 if __name__ == '__main__':
-    main()
+    prep_pipeline()

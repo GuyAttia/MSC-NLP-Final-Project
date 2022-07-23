@@ -1,10 +1,10 @@
 import json
 import os
 
-from preprocessing.paths import PATH_TO_TEST_REDDIT, TRAIN_DATA_PREFIX
 from preprocessing.tree2branches import tree2branches
 
-
+TRAIN_DATA_PREFIX = "/nlp/data/rumoureval2019/rumoureval-2019-training-data"
+PATH_TO_TEST_REDDIT= "/nlp/data/rumoureval2019/rumoureval-2019-test-data/reddit-test-data"
 
 def listdir_nohidden(path):
     contents = os.listdir(path)
@@ -14,6 +14,10 @@ def listdir_nohidden(path):
 
 
 def load_test_data_reddit(path = PATH_TO_TEST_REDDIT):
+    path_test = os.path.join("/nlp/data/rumoureval2019/rumoureval-2019-test-data", "test-key.json")
+    with open(path_test, 'r') as f:
+        test_key = json.load(f)
+    test = test_key['subtaskaenglish']
 
     conversation_ids = listdir_nohidden(path)
     conversations = {}
@@ -43,7 +47,7 @@ def load_test_data_reddit(path = PATH_TO_TEST_REDDIT):
 
                 src['used'] = 0
                 src['setA'] = 'test'
-                src['setB'] = 'test'
+                src['label'] = test[src['id_str']]
 
                 conversation['source'] = src
 
@@ -67,6 +71,7 @@ def load_test_data_reddit(path = PATH_TO_TEST_REDDIT):
 
                         tw['used'] = 0
                         tw['setA'] = 'test'
+                        tw['label'] = test[tw['id_str']]
 
                         tweets.append(tw)
                     else:
@@ -80,6 +85,7 @@ def load_test_data_reddit(path = PATH_TO_TEST_REDDIT):
                             print("No, no I don't like that reply")
 
                         tw['setA'] = 'test'
+                        tw['label'] = test[tw['id_str']]
                         tweets.append(tw)
         conversation['replies'] = tweets
         path_struct = path + '/' + id + '/structure.json'
@@ -92,7 +98,6 @@ def load_test_data_reddit(path = PATH_TO_TEST_REDDIT):
 
         conversations['test'].append(conversation)
     return conversations
-# %%
 
 def load_data():
     # this is mix of twitter and reddit
@@ -103,8 +108,6 @@ def load_data():
     path_train = os.path.join(TRAIN_DATA_PREFIX, "train-key.json")
     with open(path_train, 'r') as f:
         train_key = json.load(f)
-
-    # %%
 
     path = os.path.join(TRAIN_DATA_PREFIX, "reddit-training-data")
 
@@ -147,17 +150,6 @@ def load_data():
                 else:
 
                     print("Post was not found! Task A, Post ID: ", src['id_str'])
-
-                if src['id_str'] in list(dev_key['subtaskbenglish'].keys()):
-                    src['setB'] = 'dev'
-                    conversation['veracity'] = dev_key['subtaskbenglish'][src['id_str']]
-
-                elif src['id_str'] in list(train_key['subtaskbenglish'].keys()):
-                    src['setB'] = 'train'
-                    conversation['veracity'] = train_key['subtaskbenglish'][src['id_str']]
-
-                else:
-                    print("Post was not found! Task B, Post ID: ", src['id_str'])
 
                 conversation['source'] = src
 
@@ -222,7 +214,6 @@ def load_data():
             conversation['branches'] = branches
 
         conversations['train'].append(conversation)
-    # %%
     path = os.path.join(TRAIN_DATA_PREFIX, "reddit-dev-data")
 
     conversation_ids = listdir_nohidden(path)
@@ -258,17 +249,6 @@ def load_data():
 
                 else:
                     print("Post was not found! Task A, Post ID: ", src['id_str'])
-
-                if src['id_str'] in list(dev_key['subtaskbenglish'].keys()):
-                    src['setB'] = 'dev'
-                    conversation['veracity'] = dev_key['subtaskbenglish'][src['id_str']]
-
-                elif src['id_str'] in list(train_key['subtaskbenglish'].keys()):
-                    src['setB'] = 'train'
-                    conversation['veracity'] = train_key['subtaskbenglish'][src['id_str']]
-
-                else:
-                    print("Post was not found! Task B, Post ID: ", src['id_str'])
 
                 conversation['source'] = src
 

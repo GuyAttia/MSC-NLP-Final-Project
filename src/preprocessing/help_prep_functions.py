@@ -1,6 +1,5 @@
 import re
 
-import gensim
 import nltk
 import numpy as np
 from nltk.corpus import stopwords

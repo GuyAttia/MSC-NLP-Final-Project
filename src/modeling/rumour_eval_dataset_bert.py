@@ -60,7 +60,6 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
                 
                 sentiment = sentiment_analyser.polarity_scores(example["raw_text"])
                 example_list = [example["id"], example["branch_id"], example["tweet_id"], example["stance_label"],
-                                example["veracity_label"],
                                 "\n-----------\n".join(
                                     [example["raw_text_src"], example["raw_text_prev"], example["raw_text"]]),
                                 example["issource"], sentiment["pos"], sentiment["neu"], sentiment["neg"]] + [
@@ -80,7 +79,6 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
             ('branch_id', tt.data.RawField()),
             ('tweet_id', tt.data.RawField()),
             ('stance_label', tt.data.Field(sequential=False, use_vocab=False, batch_first=True, is_target=True)),
-            ('veracity_label', tt.data.Field(sequential=False, use_vocab=False, batch_first=True, is_target=True)),
             ('raw_text', tt.data.RawField()),
             ('issource', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
             ('sentiment_pos', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
