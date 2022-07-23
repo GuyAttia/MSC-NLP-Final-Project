@@ -16,6 +16,3 @@ PATH_TO_TEST_REDDIT= "/nlp/data/rumoureval2019/rumoureval-2019-test-data/reddit-
 # ark-park          clinton-ads      fukushima-dump     inflatable-dam        mississippi-dry  pence-sacrifice  virgin-weapons
 # barbara-bush      clinton-florida  fukushima-falling  irma-cat-6            nat-geo-footage  red-cross        wildfires-deduction
 PATH_TO_TEST_TWITTER = "/nlp/data/rumoureval2019/rumoureval-2019-test-data/twitter-en-test-data"
-
-# You do not need to set this if you are not using W2V features
-W2V_PATH = ''

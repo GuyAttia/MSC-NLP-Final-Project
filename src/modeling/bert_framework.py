@@ -1,10 +1,8 @@
 import csv
 import json
-import logging
 import math
 import os
 import socket
-import time
 import torch
 import torch.nn.functional as F
 import _csv
@@ -16,27 +14,37 @@ from torch.nn.modules.loss import _Loss
 from torchtext.data import BucketIterator, Iterator
 from torchtext.data.batch import Batch
 from tqdm import tqdm
-from datasets.rumour_eval_dataset_bert import RumourEval2019Dataset_BERTTriplets
-from modeling.base_framework import Base_Framework
+from modeling.rumour_eval_dataset_bert import RumourEval2019Dataset_BERTTriplets
 from utils.utils import count_parameters, get_timestamp, map_stance_label_to_s, get_class_weights
 from collections import Counter, defaultdict
 from typing import Callable, Tuple, Dict, List
 
 
-class BERT_Framework(Base_Framework):
+class BERT_Framework:
     """
     Framework implementing BERT training with input pattern:
     [CLS]src post. prev post[SEP]target post[SEP]
     This is our best model, submitted to RumourEval2019 competition, referred to as BERT_{big} in the paper
     """
 
-    def __init__(self, config: dict, save_treshold: float = 0.52):
-        super().__init__(config, save_treshold)
+    def __init__(self, config: dict):
+        self.config = config
         self.init_tokenizer()
 
     def init_tokenizer(self):
         self.tokenizer = BertTokenizer.from_pretrained(self.config["variant"], cache_dir="./.BERTcache",
                                                        do_lower_case=True)
+
+    def calculate_correct(self, pred_logits: torch.Tensor, labels: torch.Tensor, levels=None):
+        preds = torch.argmax(pred_logits, dim=1)
+        correct_vec = preds == labels
+        if not levels:
+            return torch.sum(correct_vec).item()
+        else:
+            sums_per_level = defaultdict(lambda: 0)
+            for level, correct in zip(levels, correct_vec):
+                sums_per_level[level] += correct.item()
+            return torch.sum(correct_vec).item(), sums_per_level
 
     def fit(self, modelfunc: Callable, skip_logging_nepochs: int = 5) -> dict:
         """
@@ -56,8 +64,7 @@ class BERT_Framework(Base_Framework):
         test_data = RumourEval2019Dataset_BERTTriplets(config["test_data"], fields, self.tokenizer,
                                                        max_length=config["hyperparameters"]["max_length"])
 
-        device = torch.device("cuda:0" if config['cuda'] and
-                                          torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         train_iter = BucketIterator(train_data, sort_key=lambda x: -len(x.text), sort=True,
                                     shuffle=False,
@@ -73,9 +80,9 @@ class BERT_Framework(Base_Framework):
 
         model = modelfunc.from_pretrained("bert-base-uncased", cache_dir="./.BERTcache").to(device)
 
-        logging.info(f"Train examples: {len(train_data.examples)}\nValidation examples: {len(dev_data.examples)}")
-        logging.info(f"Model has {count_parameters(model)} trainable parameters.")
-        logging.info(f"Manual seed {torch.initial_seed()}")
+        print(f"Train examples: {len(train_data.examples)}\nValidation examples: {len(dev_data.examples)}")
+        print(f"Model has {count_parameters(model)} trainable parameters.")
+        print(f"Manual seed {torch.initial_seed()}")
 
         optimizer = BertAdam(filter(lambda p: p.requires_grad, model.parameters()),
                              lr=config["hyperparameters"]["learning_rate"])
@@ -83,10 +90,9 @@ class BERT_Framework(Base_Framework):
         # Calculate weights for current data distribution
         weights = get_class_weights(train_data.examples, "stance_label", 4)
 
-        logging.info("class weights")
-        logging.info(f"{str(weights.numpy().tolist())}")
+        print("class weights")
+        print(f"{str(weights.numpy().tolist())}")
         lossfunction = torch.nn.CrossEntropyLoss(weight=weights.to(device))
-        start_time = time.time()
 
         # Init counters and flags
         best_val_loss = math.inf
@@ -97,78 +103,50 @@ class BERT_Framework(Base_Framework):
         bestF1_testacc = 0
         bestF1_test_F1s = [0, 0, 0, 0]
         best_val_F1s = [0, 0, 0, 0]
-        start_time = time.time()
         best_val_loss_epoch = -1
-        try:
-            # Uncomment to run prediction
-            # self.predict("answer_BERTF1_textonly.json", model, dev_iter)
-            for epoch in range(config["hyperparameters"]["epochs"]):
-                self.epoch = epoch
-                # this loss is computed during training, during active dropouts etc so it wont be similar to validation loss
-                # but computing it second time over all training data is slow
-                # You can call validate on train_iter if you wish to have proper training loss
+        # Uncomment to run prediction
+        # self.predict("answer_BERTF1_textonly.json", model, dev_iter)
+        for epoch in range(config["hyperparameters"]["epochs"]):
+            self.epoch = epoch
+            # this loss is computed during training, during active dropouts etc so it wont be similar to validation loss
+            # but computing it second time over all training data is slow
+            # You can call validate on train_iter if you wish to have proper training loss
 
-                train_loss, train_acc = self.train(model, lossfunction, optimizer, train_iter, config)
-                validation_loss, validation_acc, val_acc_per_level, val_F1, val_allF1s = self.validate(model,
-                                                                                                       lossfunction,
-                                                                                                       dev_iter,
-                                                                                                       config,
-                                                                                                       log_results=False)
-                # accuracies per level
-                sorted_val_acc_pl = sorted(val_acc_per_level.items(), key=lambda x: int(x[0]))
+            train_loss, train_acc = self.train(model, lossfunction, optimizer, train_iter, config)
+            validation_loss, validation_acc, val_acc_per_level, val_F1, val_allF1s = self.validate(model,
+                                                                                                    lossfunction,
+                                                                                                    dev_iter,
+                                                                                                    config,
+                                                                                                    log_results=False)
+            # accuracies per level
+            sorted_val_acc_pl = sorted(val_acc_per_level.items(), key=lambda x: int(x[0]))
 
-                saved = False
-                if validation_loss < best_val_loss:
-                    best_val_loss = validation_loss
-                    best_val_loss_epoch = epoch
-                    if val_F1 > self.save_treshold and self.saveruns:
-                        # Map to CPU before saving, because this requires additional memory /for some reason/
-                        model.to(torch.device("cpu"))
-                        torch.save(model,
-                                   f"saved/BIG_checkpoint_{str(self.__class__)}_F1"
-                                   f"_{val_F1:.5f}_L_{validation_loss}_{get_timestamp()}_{socket.gethostname()}.pt")
-                        model.to(device)
-                        saved = True
+            if validation_loss < best_val_loss:
+                best_val_loss = validation_loss
+                best_val_loss_epoch = epoch
 
-                if validation_acc > best_val_acc:
-                    best_val_acc = validation_acc
+            if validation_acc > best_val_acc:
+                best_val_acc = validation_acc
 
-                if val_F1 > best_val_F1:
-                    best_val_F1 = val_F1
-                    test_loss, bestF1_testacc, test_acc_per_level, bestF1_testF1, bestF1_test_F1s = self.validate(model,
-                                                                                                                  lossfunction,
-                                                                                                                  test_iter,
-                                                                                                                  config,
-                                                                                                                  log_results=False)
+            if val_F1 > best_val_F1:
+                best_val_F1 = val_F1
+                test_loss, bestF1_testacc, test_acc_per_level, bestF1_testF1, bestF1_test_F1s = self.validate(model,
+                                                                                                                lossfunction,
+                                                                                                                test_iter,
+                                                                                                                config,
+                                                                                                                log_results=False)
 
-                    if val_F1 > self.save_treshold and not saved and self.saveruns:
-                        # Map to CPU before saving, because this requires additional memory /for some reason/
-                        model.to(torch.device("cpu"))
-                        torch.save(model,
-                                   f"saved/BIG_checkpoint_{str(self.__class__)}_F1"
-                                   f"_{val_F1:.5f}_L_{validation_loss}_{get_timestamp()}_{socket.gethostname()}.pt")
-                        model.to(device)
-                # info logging
-                logging.info(
-                    f"Epoch {epoch}, Training loss|acc: {train_loss:.6f}|{train_acc:.6f}")
-                logging.info(
-                    f"Epoch {epoch}, Validation loss|acc|F1: {validation_loss:.6f}|{validation_acc:.6f}|{val_F1:.6f} - "
-                    f"(Best {best_val_loss:.4f}|{best_val_acc:4f}|{best_val_F1})\n Best Test F1 - {bestF1_testF1}")
+            # info
+            print(
+                f"Epoch {epoch}, Training loss|acc: {train_loss:.6f}|{train_acc:.6f}")
+            print(
+                f"Epoch {epoch}, Validation loss|acc|F1: {validation_loss:.6f}|{validation_acc:.6f}|{val_F1:.6f} - "
+                f"(Best {best_val_loss:.4f}|{best_val_acc:4f}|{best_val_F1})\n Best Test F1 - {bestF1_testF1}")
 
-                # debug logging
-                logging.debug(
-                    f"Epoch {epoch}, Validation loss|acc|F1: {validation_loss:.6f}|{validation_acc:.6f}|{val_F1:.6f} - "
-                    f"(Best {best_val_loss:.4f}|{best_val_acc:4f}|{best_val_F1})")
-                logging.debug("\n".join([f"{k} - {v:.2f}" for k, v in sorted_val_acc_pl]))
-
-                if validation_loss > best_val_loss and epoch > best_val_loss_epoch + self.config["early_stop_after"]:
-                    logging.info("Early stopping...")
-                    break
-        except KeyboardInterrupt:
-            logging.info('-' * 120)
-            logging.info('Exit from training early.')
-        finally:
-            logging.info(f'Finished after {(time.time() - start_time) / 60} minutes.')
+            if validation_loss > best_val_loss and epoch > best_val_loss_epoch + self.config["early_stop_after"]:
+                print("Early stopping...")
+                break
+        
         return {
             "best_loss": best_val_loss,
             "best_acc": best_val_acc,
@@ -188,7 +166,7 @@ class BERT_Framework(Base_Framework):
         }
 
     def train(self, model: torch.nn.Module, lossfunction: _Loss, optimizer: torch.optim.Optimizer,
-              train_iter: Iterator, config: dict, verbose=False) -> Tuple[float, float]:
+              train_iter: Iterator, config: dict) -> Tuple[float, float]:
         """
         :param model: model inherited from torch.nn.Module
         :param lossfunction:
@@ -198,9 +176,6 @@ class BERT_Framework(Base_Framework):
         :param verbose: whether to print verbose outputs at stdout
         :return: train loss and train accuracy
         """
-        if verbose:
-            pbar = tqdm(total=len(train_iter.data()) // train_iter.batch_size)
-
         # Initialize accumulators & flags
         examples_so_far = 0
         train_loss = 0
@@ -208,7 +183,7 @@ class BERT_Framework(Base_Framework):
         N = 0
         updated = False
 
-        # I case of gradient accumulalation, how often should gradient be updated
+        # In case of gradient accumulalation, how often should gradient be updated
         update_ratio = config["hyperparameters"]["true_batch_size"] // config["hyperparameters"]["batch_size"]
 
         optimizer.zero_grad()
@@ -230,12 +205,6 @@ class BERT_Framework(Base_Framework):
             total_correct += self.calculate_correct(pred_logits, batch.stance_label)
             examples_so_far += len(batch.stance_label)
 
-            if verbose:
-                pbar.set_description(
-                    f"train loss:"
-                    f" {train_loss / (i + 1):.4f}, train acc: {total_correct / examples_so_far:.4f}")
-                pbar.update(1)
-
         # Do the last step if needed with what has been accumulated
         if not updated:
             optimizer.step()
@@ -244,7 +213,7 @@ class BERT_Framework(Base_Framework):
         return train_loss / N, total_correct / examples_so_far
 
     @torch.no_grad()
-    def validate(self, model: torch.nn.Module, lossfunction: _Loss, dev_iter: Iterator, config: dict, verbose=False,
+    def validate(self, model: torch.nn.Module, lossfunction: _Loss, dev_iter: Iterator, config: dict,
                  log_results=True) -> Tuple[float, float, Dict[str, float], float, List[float]]:
         """
 
@@ -260,8 +229,6 @@ class BERT_Framework(Base_Framework):
         train_flag = model.training
         model.eval()
 
-        if verbose:
-            pbar = tqdm(total=len(dev_iter.data()) // dev_iter.batch_size)
         if log_results:
             csvf, writer = self.init_result_logging()
 
@@ -294,11 +261,6 @@ class BERT_Framework(Base_Framework):
                 else sum([lossfunction.weight[k].item() for k in batch.stance_label])
             total_preds += list(argmaxpreds.cpu().numpy())
             total_labels += list(batch.stance_label.cpu().numpy())
-
-            if verbose:
-                pbar.set_description(
-                    f"dev loss: {dev_loss / (i + 1):.4f}, dev acc: {total_correct / examples_so_far:.4f}")
-                pbar.update(1)
 
             if log_results:
                 self.log_to_csv(argmaxpreds, batch, branch_levels, maxpreds, writer)
@@ -368,7 +330,7 @@ class BERT_Framework(Base_Framework):
             json.dump(answers, answer_file)
         if train_flag:
             model.train()
-        logging.info(f"Writing results into {fname}")
+        print(f"Writing results into {fname}")
 
     # Columns of resulting csv file
     RESULT_HEADER = ["Correct",

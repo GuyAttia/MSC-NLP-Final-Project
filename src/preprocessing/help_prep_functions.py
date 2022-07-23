@@ -5,8 +5,6 @@ import nltk
 import numpy as np
 from nltk.corpus import stopwords
 
-from preprocessing.paths import W2V_PATH
-
 
 def str_to_wordlist(tweettext, tweet, remove_stopwords=False):
     str_text = re.sub("[^a-zA-Z]", " ", tweettext)
@@ -19,15 +17,6 @@ def str_to_wordlist(tweettext, tweet, remove_stopwords=False):
 
 global model_GN
 model_GN = None
-
-
-def loadW2vModel():
-    # LOAD PRETRAINED MODEL
-    global model_GN
-    print("Loading w2v model")
-    model_GN = gensim.models.KeyedVectors.load_word2vec_format(
-        W2V_PATH, binary=True)
-    print("Done!")
 
 
 def sumw2v(tweet, avg=True):

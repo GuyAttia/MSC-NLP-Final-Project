@@ -21,8 +21,8 @@ def convert_label(label):
         print(label)
 
 
-def prep_pipeline(dataset='RumEval2019', fset_name=None, feature_set=['avgw2v']):
-    path = 'data_preprocessing/saved_data_' + dataset
+def prep_pipeline(feature_set=['avgw2v']):
+    path = os.path.join('data_preprocessing', 'saved_data_RumEval2019')
     folds = {}
     folds = load_dataset()
 
@@ -37,7 +37,6 @@ def prep_pipeline(dataset='RumEval2019', fset_name=None, feature_set=['avgw2v'])
 
     # data folds , i.e. train, dev, test
     for fold in folds.keys():
-
         print(fold)
         # contains features for each branch in all conversations
         # shape shape conversations_count *BRANCH_COUNT x BRANCH_LEN x FEATURE vector
@@ -69,14 +68,14 @@ def prep_pipeline(dataset='RumEval2019', fset_name=None, feature_set=['avgw2v'])
 
             # build data for source tweet for veracity
             for i in range(len(thread_features_array)):
-                if fold != "test" and not fset_name.endswith("test"):
+                if fold != "test":
                     fold_veracity_labels.append(convert_label(conversation['veracity']))
                 conv_ids.append(conversation['id'])
 
         # % 0 supp, 1 comm,2 deny, 3 query
         if fold_features != []:
             path_fold = os.path.join(path, fold)
-            print(f"Writing dataset {fold} for setting {fset_name}")
+            print(f"Writing dataset {fold}")
             if not os.path.exists(path_fold):
                 os.makedirs(path_fold)
 
@@ -92,7 +91,6 @@ def prep_pipeline(dataset='RumEval2019', fset_name=None, feature_set=['avgw2v'])
                         continue
                     else:
                         already_known_tweetids.add(tweet_ids_branch[idx])
-                    # print(f"{tweet_ids_branch[idx]} {branch_labels[idx]}")
                     example = {
                         "id": cnt,
                         "branch_id": f"{fold_idx}.{idx}",
@@ -130,7 +128,7 @@ def main():
         'spacy_processed_DEPvec',
         'spacy_processed_NERvec'
     ]
-    prep_pipeline(dataset='RumEval2019', fset_name='Benchmark', feature_set=features)
+    prep_pipeline(feature_set=features)
 
 
 if __name__ == '__main__':
