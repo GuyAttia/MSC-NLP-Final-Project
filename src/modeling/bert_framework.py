@@ -114,9 +114,10 @@ class BERT_Framework:
             if validation_loss > best_val_loss and epoch > best_val_loss_epoch + self.config["early_stop_after"]:
                 print("Early stopping...")
                 break
-
-        plot_array_values_against_length(train_losses)
-        plot_confusion_matrix(self.total_labels, self.total_preds)
+            
+        if config["plot_res"] == "True":
+            plot_array_values_against_length(train_losses)
+            plot_confusion_matrix(self.total_labels, self.total_preds)
 
     def calculate_correct(self, pred_logits: torch.Tensor, labels: torch.Tensor, levels=None):
         preds = torch.argmax(pred_logits, dim=1)

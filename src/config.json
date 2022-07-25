@@ -2,6 +2,7 @@
     "baseline": {
         "early_stop_after": 4,
         "variant": "bert-large-uncased",
+        "plot_res": "True",
         "hyperparameters": {
         "learning_rate": 1.5e-06,
         "batch_size": 2,
