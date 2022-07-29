@@ -31,7 +31,7 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
             for example in data_json["Examples"]:
                 ##### Remove for full run #####
                 counter += 1
-                if counter > 30:
+                if counter > 5:
                     break
                 ##### Remove for full run #####
                 make_ids = lambda x: tokenizer.convert_tokens_to_ids(tokenizer.tokenize(x))

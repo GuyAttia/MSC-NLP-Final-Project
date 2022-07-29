@@ -59,7 +59,9 @@ class BERT_Framework:
     def fit(self, modelfunc: Callable) -> dict:
 
         config = self.config
-        train_losses, train_accuracies, train_F1s = [], [], []
+        train_losses, train_accuracies, train_F1s_global, train_F1s_weighted = [], [], [], []
+        validation_losses, validation_accuracies, validation_F1s_global, validation_F1s_weighted = [], [], [], []
+        test_losses, test_accuracies, test_F1s_global, test_F1s_weighted = [], [], [], []
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -82,13 +84,18 @@ class BERT_Framework:
             self.epoch = epoch
 
             # train model on training examples
-            train_loss, train_acc, train_F1= self.train(model, lossfunction, optimizer, train_iter, config)
+            train_loss, train_acc, train_F1_global, train_F1_weighted= self.train(model, lossfunction, optimizer, train_iter, config)
             train_losses.append(train_loss)
             train_accuracies.append(train_acc)
-            train_F1s.append(train_F1)
+            train_F1s_global.append(train_F1_global)
+            train_F1s_weighted.append(train_F1_weighted)
 
             # validate model on validation set
-            validation_loss, validation_acc, val_F1= self.validate(model, lossfunction, dev_iter, config)
+            validation_loss, validation_acc, validation_F1_global, validation_F1_weighted= self.validate(model, lossfunction, dev_iter, config)
+            validation_losses.append(validation_loss)
+            validation_accuracies.append(validation_acc)
+            validation_F1s_global.append(validation_F1_global)
+            validation_F1s_weighted.append(validation_F1_weighted)
 
             # save loss/accuracy/F1 metrics in case of improvement
             if validation_loss < best_val_loss:
@@ -98,17 +105,21 @@ class BERT_Framework:
             if validation_acc > best_val_acc:
                 best_val_acc = validation_acc
 
-            if val_F1 > best_val_F1:
-                best_val_F1 = val_F1
+            if validation_F1_global > best_val_F1:
+                best_val_F1 = validation_F1_global
                 # calculate metrics on test set
-                _, test_accuracy, F1_test = self.validate(model, lossfunction, test_iter, config)
+            test_loss, test_accuracy, F1_test_global, test_F1_weighted = self.validate(model, lossfunction, test_iter, config)
+            test_losses.append(test_loss)
+            test_accuracies.append(test_accuracy)
+            test_F1s_global.append(F1_test_global)
+            test_F1s_weighted.append(test_F1_weighted)
 
             # print results
             print(f"Epoch: {epoch}")
             print(f"Train- loss: {train_loss}, accuracy: {train_acc}")
-            print(f"Validation- loss: {validation_loss}, accuracy: {validation_acc}, F1: {val_F1}\n"
+            print(f"Validation- loss: {validation_loss}, accuracy: {validation_acc}, F1: {validation_F1_global}\n"
                   f"(Best loss: {best_val_loss} Best accuracy: {best_val_acc}, Best F1: {best_val_F1})")
-            print(f"Test- accuracy: {test_accuracy}, F1: {F1_test}")
+            print(f"Test- accuracy: {test_accuracy}, F1: {F1_test_global}")
 
             # early stopping 
             if validation_loss > best_val_loss and epoch > best_val_loss_epoch + self.config["early_stop_after"]:
@@ -116,7 +127,10 @@ class BERT_Framework:
                 break
             
         if config["plot_res"] == "True":
-            plot_array_values_against_length(train_losses)
+            plot_array_values_against_length([train_losses, validation_losses, test_losses], "Loss vs Epochs")
+            plot_array_values_against_length([train_accuracies, validation_accuracies, test_accuracies], "Accuracy vs Epochs")
+            plot_array_values_against_length([train_F1s_global, validation_F1s_global, test_F1s_global], "Global F1 score vs Epochs")
+            plot_array_values_against_length([train_F1s_weighted, validation_F1s_weighted, test_F1s_weighted], "Weighted F1 score vs Epochs")
             plot_confusion_matrix(self.total_labels, self.total_preds)
 
     def calculate_correct(self, pred_logits: torch.Tensor, labels: torch.Tensor, levels=None):
@@ -174,9 +188,10 @@ class BERT_Framework:
 
         loss = train_loss / N
         accuracy = total_correct / examples_so_far
-        F1 = metrics.f1_score(self.total_labels, self.total_preds, average="macro").item()
+        F1_global = metrics.f1_score(self.total_labels, self.total_preds, average="macro").item()  
+        F1_weighted = metrics.f1_score(self.total_labels, self.total_preds, average='weighted').item()
 
-        return loss, accuracy, F1
+        return loss, accuracy, F1_global, F1_weighted
 
     @torch.no_grad()
     def validate(self, model: torch.nn.Module, lossfunction: _Loss, dev_iter: Iterator, config: dict) -> Tuple[float, float, float, List[float]]:
@@ -215,8 +230,8 @@ class BERT_Framework:
         loss = dev_loss / N 
         accuracy = total_correct / examples_so_far
 
-        F1 = metrics.f1_score(total_labels, total_preds, average="macro").item()
-        # allF1s = metrics.f1_score(total_labels, total_preds, average=None).tolist()
+        F1_global = metrics.f1_score(total_labels, total_preds, average="macro").item()
+        F1_weighted = metrics.f1_score(total_labels, total_preds, average='weighted').item()
         if train_flag:
             model.train()
-        return loss, accuracy, F1#, allF1s
+        return loss, accuracy, F1_global, F1_weighted
