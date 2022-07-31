@@ -57,13 +57,16 @@ class BERT_Framework:
         return train_iter, dev_iter, test_iter, weights
 
     def fit(self, modelfunc: Callable) -> dict:
-
+        
+        # Init counters and flags
         config = self.config
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         train_losses, train_accuracies, train_F1s_global, train_F1s_weighted = [], [], [], []
         validation_losses, validation_accuracies, validation_F1s_global, validation_F1s_weighted = [], [], [], []
         test_losses, test_accuracies, test_F1s_global, test_F1s_weighted = [], [], [], []
-
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        best_val_loss, best_val_acc, best_val_F1 = math.inf, 0, 0
+        test_accuracy = 0
+        best_val_loss_epoch = -1     
 
         train_iter, dev_iter, test_iter, weights = self.create_dataset_iterators()
 
@@ -75,10 +78,6 @@ class BERT_Framework:
                              lr=config["hyperparameters"]["learning_rate"])
         lossfunction = torch.nn.CrossEntropyLoss(weight=weights.to(self.device))
 
-        # Init counters and flags
-        best_val_loss, best_val_acc, best_val_F1 = math.inf, 0, 0
-        test_accuracy, F1_test = 0, 0
-        best_val_loss_epoch = -1
 
         for epoch in range(config["hyperparameters"]["epochs"]):
             self.epoch = epoch
