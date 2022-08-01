@@ -1,7 +1,5 @@
 import json
-import torch
 import torchtext as tt
-
 from typing import List, Tuple
 from pytorch_pretrained_bert import BertTokenizer
 from torchtext.data import Example

@@ -51,12 +51,10 @@ class BERT_Framework:
 
         # Calculate weights for current data distribution
         weights = get_class_weights(train_data.examples, "stance_label", 4)
-        # print("class weights")
-        # print(f"{str(weights.numpy().tolist())}")
 
         return train_iter, dev_iter, test_iter, weights
 
-    def fit(self, modelfunc: Callable) -> dict:
+    def fit(self, modelfunc: Callable, lr:int=None) -> dict:
         
         # Init counters and flags
         config = self.config
@@ -71,13 +69,14 @@ class BERT_Framework:
         train_iter, dev_iter, test_iter, weights = self.create_dataset_iterators()
 
         model = modelfunc.from_pretrained("bert-base-uncased", cache_dir="./.BERTcache").to(self.device)
-        # print(f"Model has {count_parameters(model)} trainable parameters.")
-        # print(f"Manual seed {torch.initial_seed()}")
 
-        optimizer = BertAdam(filter(lambda p: p.requires_grad, model.parameters()),
+        if lr:
+            optimizer = BertAdam(filter(lambda p: p.requires_grad, model.parameters()),
+                             lr=lr)
+        else:
+            optimizer = BertAdam(filter(lambda p: p.requires_grad, model.parameters()),
                              lr=config["hyperparameters"]["learning_rate"])
         lossfunction = torch.nn.CrossEntropyLoss(weight=weights.to(self.device))
-
 
         for epoch in range(config["hyperparameters"]["epochs"]):
             self.epoch = epoch
@@ -130,18 +129,7 @@ class BERT_Framework:
             plot_array_values_against_length([train_accuracies, validation_accuracies, test_accuracies], "Accuracy vs Epochs")
             plot_array_values_against_length([train_F1s_global, validation_F1s_global, test_F1s_global], "Global F1 score vs Epochs")
             plot_array_values_against_length([train_F1s_weighted, validation_F1s_weighted, test_F1s_weighted], "Weighted F1 score vs Epochs")
-            plot_confusion_matrix(self.total_labels, self.total_preds)
-
-    def calculate_correct(self, pred_logits: torch.Tensor, labels: torch.Tensor, levels=None):
-        preds = torch.argmax(pred_logits, dim=1)
-        correct_vec = preds == labels
-        if not levels:
-            return torch.sum(correct_vec).item()
-        else:
-            sums_per_level = defaultdict(lambda: 0)
-            for level, correct in zip(levels, correct_vec):
-                sums_per_level[level] += correct.item()
-            return torch.sum(correct_vec).item(), sums_per_level
+            #plot_confusion_matrix(self.total_labels, self.total_preds)
 
     def train(self, model: torch.nn.Module, lossfunction: _Loss, optimizer: torch.optim.Optimizer,
               train_iter: Iterator, config: dict) -> Tuple[float, float]:
@@ -234,3 +222,14 @@ class BERT_Framework:
         if train_flag:
             model.train()
         return loss, accuracy, F1_global, F1_weighted
+
+    def calculate_correct(self, pred_logits: torch.Tensor, labels: torch.Tensor, levels=None):
+        preds = torch.argmax(pred_logits, dim=1)
+        correct_vec = preds == labels
+        if not levels:
+            return torch.sum(correct_vec).item()
+        else:
+            sums_per_level = defaultdict(lambda: 0)
+            for level, correct in zip(levels, correct_vec):
+                sums_per_level[level] += correct.item()
+            return torch.sum(correct_vec).item(), sums_per_level
