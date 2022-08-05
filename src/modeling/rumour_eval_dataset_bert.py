@@ -2,6 +2,7 @@ import json
 import torchtext as tt
 from typing import List, Tuple
 from pytorch_pretrained_bert import BertTokenizer
+from transformers import RobertaTokenizer, GPT2Tokenizer
 from torchtext.data import Example
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
@@ -27,31 +28,43 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
 
             counter = 0
             for example in data_json["Examples"]:
-                # ##### Remove for full run #####
-                # counter += 1
-                # if counter > 5:
-                #     break
-                # ##### Remove for full run #####
+                ##### Remove for full run #####
+                counter += 1
+                if counter > 5:
+                    break
+                ##### Remove for full run #####
                 make_ids = lambda x: tokenizer.convert_tokens_to_ids(tokenizer.tokenize(x))
                 text = make_ids(example["spacy_processed_text"])
                 prev = make_ids(example["spacy_processed_text_prev"])
                 src = make_ids(example["spacy_processed_text_src"])
                 segment_A = src + prev
                 segment_B = text
-                text_ids = [tokenizer.vocab["[CLS]"]] + segment_A + \
-                           [tokenizer.vocab["[SEP]"]] + segment_B + [tokenizer.vocab["[SEP]"]]
+                if type(tokenizer) == BertTokenizer:
+                    text_ids = [tokenizer.vocab["[CLS]"]] + segment_A + \
+                            [tokenizer.vocab["[SEP]"]] + segment_B + [tokenizer.vocab["[SEP]"]]
+                if type(tokenizer) == RobertaTokenizer or type(tokenizer) == GPT2Tokenizer:
+                    text_ids = tokenizer.encode("[CLS]") + segment_A + \
+                            tokenizer.encode("[SEP]") + segment_B + tokenizer.encode("[SEP]")
 
                 # truncate if exceeds max length
                 if len(text_ids) > max_length:
                     # Truncate segment A
                     segment_A = segment_A[:max_length // 2]
-                    text_ids = [tokenizer.vocab["[CLS]"]] + segment_A + \
-                               [tokenizer.vocab["[SEP]"]] + segment_B + [tokenizer.vocab["[SEP]"]]
+                    if type(tokenizer) == BertTokenizer:
+                        text_ids = [tokenizer.vocab["[CLS]"]] + segment_A + \
+                                [tokenizer.vocab["[SEP]"]] + segment_B + [tokenizer.vocab["[SEP]"]]
+                    if type(tokenizer) == RobertaTokenizer or type(tokenizer) == GPT2Tokenizer:
+                        text_ids = tokenizer.encode("[CLS]") + segment_A + \
+                                tokenizer.encode("[SEP]") + segment_B + tokenizer.encode("[SEP]")
                     if len(text_ids) > max_length:
                         # Truncate also segment B
                         segment_B = segment_B[:max_length // 2]
-                        text_ids = [tokenizer.vocab["[CLS]"]] + segment_A + \
-                                   [tokenizer.vocab["[SEP]"]] + segment_B + [tokenizer.vocab["[SEP]"]]
+                        if type(tokenizer) == BertTokenizer:
+                            text_ids = [tokenizer.vocab["[CLS]"]] + segment_A + \
+                                    [tokenizer.vocab["[SEP]"]] + segment_B + [tokenizer.vocab["[SEP]"]]
+                        if type(tokenizer) == RobertaTokenizer or type(tokenizer) == GPT2Tokenizer:
+                            text_ids = tokenizer.encode("[CLS]") + segment_A + \
+                                    tokenizer.encode("[SEP]") + segment_B + tokenizer.encode("[SEP]")
 
                 segment_ids = [0] * (len(segment_A) + 2) + [1] * (len(segment_B) + 1)
                 input_mask = [1] * len(segment_ids)

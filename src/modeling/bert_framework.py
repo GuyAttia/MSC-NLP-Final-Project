@@ -2,6 +2,9 @@ import math
 import torch
 import torch.nn.functional as F
 from pytorch_pretrained_bert import BertAdam, BertTokenizer
+from transformers import RobertaTokenizer, GPT2Tokenizer
+
+
 from sklearn import metrics
 from torch.nn.modules.loss import _Loss
 from torchtext.data import BucketIterator, Iterator
@@ -15,14 +18,16 @@ from typing import Callable, Tuple, List
 
 
 class BERT_Framework:
-
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, modelfunc):
         self.config = config
+        self.modelfunc = modelfunc
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.init_tokenizer()
 
     def init_tokenizer(self):
         self.tokenizer = BertTokenizer.from_pretrained(self.config["variant"], cache_dir="./.BERTcache",
                                                        do_lower_case=True)
+        self.model = self.modelfunc.from_pretrained("bert-base-uncased", cache_dir="./.BERTcache").to(self.device)
 
     def create_dataset_iterators(self):
         # Create DataSets
@@ -54,11 +59,11 @@ class BERT_Framework:
 
         return train_iter, dev_iter, test_iter, weights
 
-    def fit(self, modelfunc: Callable, lr:int=None) -> dict:
+    def fit(self, modelf, lr:int=None) -> dict:
         
         # Init counters and flags
         config = self.config
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        
         train_losses, train_accuracies, train_F1s_global, train_F1s_weighted = [], [], [], []
         validation_losses, validation_accuracies, validation_F1s_global, validation_F1s_weighted = [], [], [], []
         test_losses, test_accuracies, test_F1s_global, test_F1s_weighted = [], [], [], []
@@ -68,13 +73,11 @@ class BERT_Framework:
 
         train_iter, dev_iter, test_iter, weights = self.create_dataset_iterators()
 
-        model = modelfunc.from_pretrained("bert-base-uncased", cache_dir="./.BERTcache").to(self.device)
-
         if lr:
-            optimizer = BertAdam(filter(lambda p: p.requires_grad, model.parameters()),
+            optimizer = BertAdam(filter(lambda p: p.requires_grad, self.model.parameters()),
                              lr=lr)
         else:
-            optimizer = BertAdam(filter(lambda p: p.requires_grad, model.parameters()),
+            optimizer = BertAdam(filter(lambda p: p.requires_grad, self.model.parameters()),
                              lr=config["hyperparameters"]["learning_rate"])
         lossfunction = torch.nn.CrossEntropyLoss(weight=weights.to(self.device))
 
@@ -82,14 +85,14 @@ class BERT_Framework:
             self.epoch = epoch
 
             # train model on training examples
-            train_loss, train_acc, train_F1_global, train_F1_weighted= self.train(model, lossfunction, optimizer, train_iter, config)
+            train_loss, train_acc, train_F1_global, train_F1_weighted= self.train(self.model, lossfunction, optimizer, train_iter, config)
             train_losses.append(train_loss)
             train_accuracies.append(train_acc)
             train_F1s_global.append(train_F1_global)
             train_F1s_weighted.append(train_F1_weighted)
 
             # validate model on validation set
-            validation_loss, validation_acc, validation_F1_global, validation_F1_weighted= self.validate(model, lossfunction, dev_iter, config)
+            validation_loss, validation_acc, validation_F1_global, validation_F1_weighted= self.validate(self.model, lossfunction, dev_iter, config)
             validation_losses.append(validation_loss)
             validation_accuracies.append(validation_acc)
             validation_F1s_global.append(validation_F1_global)
@@ -106,7 +109,7 @@ class BERT_Framework:
             if validation_F1_global > best_val_F1:
                 best_val_F1 = validation_F1_global
                 # calculate metrics on test set
-            test_loss, test_accuracy, F1_test_global, test_F1_weighted = self.validate(model, lossfunction, test_iter, config)
+            test_loss, test_accuracy, F1_test_global, test_F1_weighted = self.validate(self.model, lossfunction, test_iter, config)
             test_losses.append(test_loss)
             test_accuracies.append(test_accuracy)
             test_F1s_global.append(F1_test_global)
@@ -233,3 +236,28 @@ class BERT_Framework:
             for level, correct in zip(levels, correct_vec):
                 sums_per_level[level] += correct.item()
             return torch.sum(correct_vec).item(), sums_per_level
+
+
+class RoBERTa_Framework(BERT_Framework):
+    def __init__(self, config: dict, modelfunc):
+        super(RoBERTa_Framework, self).__init__(config, modelfunc)
+        self.config = config        
+        self.modelfunc = modelfunc
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.init_tokenizer()
+
+    def init_tokenizer(self):
+        self.tokenizer = RobertaTokenizer.from_pretrained('roberta-large')
+        self.model = self.modelfunc.from_pretrained('roberta-large').to(self.device)
+
+class GPT2_Framework(BERT_Framework):
+    def __init__(self, config: dict, modelfunc):
+        super(GPT2_Framework, self).__init__(config, modelfunc)
+        self.config = config        
+        self.modelfunc = modelfunc
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.init_tokenizer()
+
+    def init_tokenizer(self):
+        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        self.model = self.modelfunc.from_pretrained('gpt2').to(self.device)
