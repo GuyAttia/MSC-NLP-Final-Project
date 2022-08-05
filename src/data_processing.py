@@ -10,29 +10,45 @@ from preprocessing.preprocessing_tweets import load_dataset, load_test_data_twit
 from preprocessing.transform_feature_dict import transform_feature_dict
 
 
+def load_reddit_and_twitter_data():
+    folds = {}
+    # Load twitter train and validation datasets
+    folds = load_dataset()
+    # Load twitter test dataset
+    folds["test"] = load_test_data_twitter()["test"]
+    
+    # Load reddit train and validation datasets
+    reddit = load_data()
+    folds['train'].extend(reddit['train'])
+    folds['dev'].extend(reddit['dev'])
+    # Load reddit test dataset
+    reddit_test_data = load_test_data_reddit()['test']
+    folds["test"].extend(reddit_test_data)
+    
+    return folds
+
+
 def prep_pipeline():
     path = os.path.join('data_preprocessing', 'saved_data_RumEval2019')
+    
+    # Define the data features for the model
     feature_set = [
         'issource',
         'raw_text',
         'spacy_processed_text',
-        'spacy_processed_BLvec',
-        'spacy_processed_POSvec',
-        'spacy_processed_DEPvec',
-        'spacy_processed_NERvec'
+        'spacy_processed_NERvec',
+        'hasqmark', 
+        'hasemark', 
+        'hashashtag', 
+        'hasurl', 
+        'haspic', 
+        'hasnegation', 
+        'hasswearwords', 
+        'src_rumour', 
+        'thread_rumour'
     ]
 
-    folds = {}
-    folds = load_dataset()
-
-    folds["test"] = load_test_data_twitter()["test"]
-    
-    # use reddit data
-    reddit = load_data()
-    folds['train'].extend(reddit['train'])
-    folds['dev'].extend(reddit['dev'])
-    reddit_test_data = load_test_data_reddit()['test']
-    folds["test"].extend(reddit_test_data)
+    folds = load_reddit_and_twitter_data()
 
     # data folds , i.e. train, dev, test
     for fold in folds.keys():
@@ -56,8 +72,7 @@ def prep_pipeline():
             all_fold_features.append(thread_feature_dict)
 
             thread_features_array, thread_features_dict, thread_stance_labels, branches = transform_feature_dict(
-                thread_feature_dict, conversation,
-                feature_set=feature_set)
+                thread_feature_dict, conversation, feature_set=feature_set)
 
             fold_features_dict.extend(thread_features_dict)
             fold_stance_labels.extend(thread_stance_labels)
@@ -68,7 +83,7 @@ def prep_pipeline():
             for i in range(len(thread_features_array)):
                 conv_ids.append(conversation['id'])
 
-        # % 0 supp, 1 comm,2 deny, 3 query
+        # Saving the data (0 supp, 1 comm,2 deny, 3 query)
         if fold_features != []:
             path_fold = os.path.join(path, fold)
             print(f"Writing dataset {fold}")
@@ -97,10 +112,16 @@ def prep_pipeline():
                         "raw_text_src": e[0]["raw_text"] if idx - 1 > -1 else "",
                         "issource": e[idx]["issource"],
                         "spacy_processed_text": e[idx]["spacy_processed_text"],
-                        'spacy_processed_BLvec': e[idx]['spacy_processed_BLvec'],
-                        'spacy_processed_POSvec': e[idx]['spacy_processed_POSvec'],
-                        'spacy_processed_DEPvec': e[idx]['spacy_processed_DEPvec'],
                         'spacy_processed_NERvec': e[idx]['spacy_processed_NERvec'],
+                        'hasqmark': e[idx]['hasqmark'],
+                        'hasemark': e[idx]['hasemark'],
+                        'hashashtag': e[idx]['hashashtag'],
+                        'hasurl': e[idx]['hasurl'],
+                        'haspic': e[idx]['haspic'],
+                        'hasnegation': e[idx]['hasnegation'],
+                        'hasswearwords': e[idx]['hasswearwords'],
+                        'src_rumour': e[idx]['src_rumour'],
+                        'thread_rumour': e[idx]['thread_rumour'],
                         "spacy_processed_text_prev": e[idx - 1]["spacy_processed_text"] if idx - 1 > -1 else "",
                         "spacy_processed_text_src": e[0]["spacy_processed_text"] if idx - 1 > -1 else ""
                     }

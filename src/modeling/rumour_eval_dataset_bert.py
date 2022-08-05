@@ -5,6 +5,7 @@ from pytorch_pretrained_bert import BertTokenizer
 from transformers import RobertaTokenizer, GPT2Tokenizer
 from torchtext.data import Example
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+import torch
 
 """
 This file contains implementation of RumourEval2019 datasets extending torchtext.data.Dataset class
@@ -16,9 +17,9 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
     """
 
     def __init__(self, path: str, fields: List[Tuple[str, tt.data.Field]], tokenizer: BertTokenizer,
-                 max_length: int = 512, **kwargs):
+                 max_length: int = 512, max_examples=None, with_features=False, **kwargs):
         max_length = max_length - 3  # Count without special tokens
-        sentiment_analyser = SentimentIntensityAnalyzer()
+
         with open(path) as dataf:
             data_json = json.load(dataf)
             examples = []
@@ -28,17 +29,17 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
 
             counter = 0
             for example in data_json["Examples"]:
-                # ##### Remove for full run #####
-                # counter += 1
-                # if counter > 5:
-                #     break
-                # ##### Remove for full run #####
+                counter += 1
+                if max_examples and (counter >= max_examples):  # Only for quick tests
+                    break
                 make_ids = lambda x: tokenizer.convert_tokens_to_ids(tokenizer.tokenize(x))
                 text = make_ids(example["spacy_processed_text"])
                 prev = make_ids(example["spacy_processed_text_prev"])
                 src = make_ids(example["spacy_processed_text_src"])
-                segment_A = src + prev
+                segment_A = src + prev  # Combine the source sentence and the previous sentence together
                 segment_B = text
+
+                # Tokenize the sentences with start and seperators tokens
                 if type(tokenizer) == BertTokenizer:
                     text_ids = [tokenizer.vocab["[CLS]"]] + segment_A + \
                             [tokenizer.vocab["[SEP]"]] + segment_B + [tokenizer.vocab["[SEP]"]]
@@ -69,23 +70,53 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
                 segment_ids = [0] * (len(segment_A) + 2) + [1] * (len(segment_B) + 1)
                 input_mask = [1] * len(segment_ids)
                 
+                # Create sentiment analysis for the raw data
+                sentiment_analyser = SentimentIntensityAnalyzer()
                 sentiment = sentiment_analyser.polarity_scores(example["raw_text"])
-                example_list = [example["id"], example["branch_id"], example["tweet_id"], example["stance_label"],
-                                "\n-----------\n".join(
-                                    [example["raw_text_src"], example["raw_text_prev"], example["raw_text"]]),
-                                example["issource"], sentiment["pos"], sentiment["neu"], sentiment["neg"]] + [
-                                    text_ids, segment_ids, input_mask]
+
+                # Build the example with all the relevant features
+                example_list = [
+                    example["id"],  # id
+                    example["branch_id"],   # branch_id
+                    example["tweet_id"], # tweet_id
+                    example["stance_label"], # stance_label
+                    "\n-----------\n".join([example["raw_text_src"], example["raw_text_prev"], example["raw_text"]]),  # raw_text
+                    example["issource"],  # issource
+                    sentiment["pos"],  # sentiment_pos
+                    sentiment["neu"],  # sentiment_neu
+                    sentiment["neg"]    # sentiment_neg
+                ] + [
+                    text_ids,   # text
+                    segment_ids, # type_mask
+                    input_mask  # input_mask
+                ] 
+
+                if with_features:
+                    example_list += [
+                        example['hasqmark'],
+                        example['hasemark'],
+                        example['hashashtag'],
+                        example['hasurl'],
+                        example['haspic'],
+                        example['hasnegation'],
+                        example['hasswearwords'],
+                        example['src_rumour'],
+                        example['thread_rumour']#,
+                        # example['spacy_processed_NERvec']
+                    ]
 
                 examples.append(Example.fromlist(example_list, fields))
             super(RumourEval2019Dataset_BERTTriplets, self).__init__(examples, fields, **kwargs)
 
     @staticmethod
-    def prepare_fields_for_text():
+    def prepare_fields_for_text(with_features=False):
         """
         BERT [PAD] token has index 0
         """
         text_field = lambda: tt.data.Field(use_vocab=False, batch_first=True, sequential=True, pad_token=0)
-        return [
+        float_field = lambda: tt.data.Field(use_vocab=False, batch_first=True, sequential=False, dtype=torch.float)
+
+        fields = [
             ('id', tt.data.RawField()),
             ('branch_id', tt.data.RawField()),
             ('tweet_id', tt.data.RawField()),
@@ -97,4 +128,21 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
             ('sentiment_neg', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
             ('text', text_field()),
             ('type_mask', text_field()),
-            ('input_mask', text_field())]
+            ('input_mask', text_field())
+        ]
+
+        if with_features:
+            fields += [
+                ('hasqmark', float_field()),
+                ('hasemark', float_field()),
+                ('hashashtag', float_field()),
+                ('hasurl', float_field()),
+                ('haspic', float_field()),
+                ('hasnegation', float_field()),
+                ('hasswearwords', float_field()),
+                ('src_rumour', float_field()),
+                ('thread_rumour', float_field())#,
+                #('spacy_processed_NERvec', tt.data.Field(use_vocab=False, dtype=torch.float, batch_first=True, pad_token=0))
+            ]
+        return fields
+

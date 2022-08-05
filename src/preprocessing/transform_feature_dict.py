@@ -65,30 +65,10 @@ def transform_feature_dict(thread_feature_dict, conversation, feature_set):
 
     return thread_features_array, thread_features_dict, thread_stance_labels, clean_branches
 
-def dict_to_array(feature_dict, feature_set):
-    """
-    Create array from selected features
-    :param feature_dict:
-    :param feature_set:
-    :return:
-    """
-    tweet_rep = []
-    for feature_name in feature_set:
-
-        if np.isscalar(feature_dict[feature_name]):
-            tweet_rep.append(feature_dict[feature_name])
-        else:
-            tweet_rep.extend(feature_dict[feature_name])
-    tweet_rep = np.asarray(tweet_rep)
-    return tweet_rep
-
 
 def dict_to_array_and_dict(feature_dict, feature_set):
     """
     Create array from selected features
-    :param feature_dict:
-    :param feature_set:
-    :return:
     """
     tweet_rep = []
     tweet_rep_d = dict()

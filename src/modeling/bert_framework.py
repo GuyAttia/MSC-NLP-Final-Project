@@ -2,26 +2,41 @@ import math
 import torch
 import torch.nn.functional as F
 from pytorch_pretrained_bert import BertAdam, BertTokenizer
-from transformers import RobertaTokenizer, GPT2Tokenizer, GPT2ForSequenceClassification
-from transformers import GPT2Config
-
+from transformers import RobertaTokenizer, GPT2Tokenizer, GPT2ForSequenceClassification, GPT2Config
 from sklearn import metrics
 from torch.nn.modules.loss import _Loss
 from torch.optim import AdamW
 from torchtext.data import BucketIterator, Iterator
+from collections import Counter, defaultdict, Iterable
+from typing import Tuple, List
 
 from modeling.rumour_eval_dataset_bert import RumourEval2019Dataset_BERTTriplets
 from plot_results import plot_array_values_against_length, plot_confusion_matrix
 
-from utils.utils import count_parameters, get_class_weights
-from collections import Counter, defaultdict
-from typing import Callable, Tuple, List
+MAX_EXAMPLES = 5  # Todo: Change into None for full run
+
+def get_class_weights(examples: Iterable, label_field_name: str, classes: int) -> torch.FloatTensor:
+    """
+    Calculate class weight in order to enforce a flat prior
+    :param examples:  data examples
+    :param label_field_name: a name of label attribute of the field (if e is an Example and a name is "label",
+           e.label will be reference to access label value
+    :param classes: number of classes
+    :return: an array of class weights (cast as torch.FloatTensor)
+    """
+    arr = torch.zeros(classes)
+    for e in examples:
+        arr[int(getattr(e, label_field_name))] += 1
+
+    arrmax = arr.max().expand(classes)
+    return arrmax / arr
 
 
 class BERT_Framework:
-    def __init__(self, config: dict, modelfunc):
+    def __init__(self, config: dict, modelfunc, with_features=False):
         self.config = config
         self.modelfunc = modelfunc
+        self.with_features = with_features
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.init_tokenizer()
 
@@ -32,13 +47,16 @@ class BERT_Framework:
 
     def create_dataset_iterators(self):
         # Create DataSets
-        fields = RumourEval2019Dataset_BERTTriplets.prepare_fields_for_text()
+        fields = RumourEval2019Dataset_BERTTriplets.prepare_fields_for_text(with_features=self.with_features)
         train_data = RumourEval2019Dataset_BERTTriplets(self.config["train_data"], fields, self.tokenizer,
-                                                        max_length=self.config["hyperparameters"]["max_length"])
+                                                        max_length=self.config["hyperparameters"]["max_length"],
+                                                        max_examples=MAX_EXAMPLES, with_features=self.with_features)
         dev_data = RumourEval2019Dataset_BERTTriplets(self.config["dev_data"], fields, self.tokenizer,
-                                                      max_length=self.config["hyperparameters"]["max_length"])
+                                                      max_length=self.config["hyperparameters"]["max_length"],
+                                                        max_examples=MAX_EXAMPLES, with_features=self.with_features) 
         test_data = RumourEval2019Dataset_BERTTriplets(self.config["test_data"], fields, self.tokenizer,
-                                                       max_length=self.config["hyperparameters"]["max_length"])
+                                                       max_length=self.config["hyperparameters"]["max_length"],
+                                                        max_examples=MAX_EXAMPLES, with_features=self.with_features) 
 
         # Create iterators
         train_iter = BucketIterator(train_data, sort_key=lambda x: -len(x.text), sort=True,
@@ -258,8 +276,8 @@ class BERT_Framework:
 
 
 class RoBERTa_Framework(BERT_Framework):
-    def __init__(self, config: dict, modelfunc):
-        super(RoBERTa_Framework, self).__init__(config, modelfunc)
+    def __init__(self, config: dict, modelfunc, with_features=False):
+        super(RoBERTa_Framework, self).__init__(config, modelfunc, with_features=with_features)
         self.config = config        
         self.modelfunc = modelfunc
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

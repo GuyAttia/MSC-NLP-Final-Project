@@ -2,12 +2,10 @@ from os import path
 import json as js
 from argparse import ArgumentParser
 from modeling.bert_framework import BERT_Framework, RoBERTa_Framework, GPT2_Framework
-from modeling.text_bert import BertModelForStanceClassification, RoBertaModelForStanceClassification, GPT2ModelForStanceClassification
+from modeling.models import *
 
 
 def main(model='baseline'):
-    
-
     with open(path.join('src', 'config.json')) as f:
         config = js.load(f)
 
@@ -19,6 +17,10 @@ def main(model='baseline'):
         fworkf = RoBERTa_Framework
         modelf = RoBertaModelForStanceClassification
         modelframework = fworkf(config['roberta'], modelf)
+    elif model == 'roberta_with_features':
+        fworkf = RoBERTa_Framework
+        modelf = RoBertaWFeaturesModelForStanceClassification
+        modelframework = fworkf(config['roberta'], modelf, with_features=True)
     elif model == 'gpt2':
         fworkf = GPT2_Framework
         modelf = GPT2ModelForStanceClassification
@@ -30,7 +32,14 @@ def main(model='baseline'):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('-m', '--model', help='Rather running the baseline or new model', required=False, choices=['baseline', 'roberta', 'gpt2'], default='roberta')
+    parser.add_argument(
+        '-m', 
+        '--model', 
+        help='Rather running the baseline or new model', 
+        required=False, 
+        choices=['baseline', 'roberta', 'roberta_with_features', 'gpt2'], 
+        default='roberta'
+    )
 
     args = parser.parse_args()
     kwargs = vars(args)

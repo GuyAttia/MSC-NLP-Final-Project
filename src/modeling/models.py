@@ -1,18 +1,19 @@
 from pytorch_pretrained_bert import BertModel
 from pytorch_transformers import RobertaModel
-from transformers import GPT2Model, GPT2LMHeadModel, PretrainedConfig
-from transformers import GPT2Model, GPT2Config
+from transformers import GPT2Model, GPT2LMHeadModel, PretrainedConfig, GPT2Config
 from pytorch_pretrained_bert.modeling import BertPreTrainedModel
-from torch import nn
+from torch import nn, cat
+import torch.nn.functional as F
+
 
 class BertModelForStanceClassification(BertPreTrainedModel):
     """
-        `input_ids`: a torch.LongTensor of shape [batch_siz, sequence_length]
-        `token_type_ids`: an optional torch.LongTensor of shape [batch_size, sequence_length]
+        `text`: a torch.LongTensor of shape [batch_siz, sequence_length]
+        `type_mask`: an optional torch.LongTensor of shape [batch_size, sequence_length]
             with the token types indices selected in [0, 1]. Type 0 corresponds to a `sentence A`
             and type 1 corresponds to a `sentence B` token (see BERT paper for more details).
 
-        `attention_mask`: an optional torch.LongTensor of shape [batch_size, sequence_length] with indices
+        `input_mask`: an optional torch.LongTensor of shape [batch_size, sequence_length] with indices
             selected in [0, 1]. It's a mask to be used if the input sequence length is smaller than the max
             input sequence length in the current batch. It's the mask that we typically use for attention when
             a batch has varying length sentences.
@@ -37,15 +38,7 @@ class BertModelForStanceClassification(BertPreTrainedModel):
 
 class RoBertaModelForStanceClassification(RobertaModel):
     """
-        `input_ids`: a torch.LongTensor of shape [batch_siz, sequence_length]
-        `token_type_ids`: an optional torch.LongTensor of shape [batch_size, sequence_length]
-            with the token types indices selected in [0, 1]. Type 0 corresponds to a `sentence A`
-            and type 1 corresponds to a `sentence B` token (see BERT paper for more details).
-
-        `attention_mask`: an optional torch.LongTensor of shape [batch_size, sequence_length] with indices
-            selected in [0, 1]. It's a mask to be used if the input sequence length is smaller than the max
-            input sequence length in the current batch. It's the mask that we typically use for attention when
-            a batch has varying length sentences.
+        `text`: a torch.LongTensor of shape [batch_siz, sequence_length]
     """
 
     def __init__(self, config, classes=4):
@@ -64,7 +57,49 @@ class RoBertaModelForStanceClassification(RobertaModel):
         logits = self.last_layer(pooled_output)
         return logits
 
-class GPT2ModelForStanceClassification(nn.Module):
+class RoBertaWFeaturesModelForStanceClassification(RobertaModel):
+    """
+        `text`: a torch.LongTensor of shape [batch_siz, sequence_length]
+    """
+
+    def __init__(self, config, classes=4):
+        super(RoBertaWFeaturesModelForStanceClassification, self).__init__(config)
+        self.roberta = RobertaModel(config)
+        
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+
+        self.hidden_layer = nn.Linear(config.hidden_size + 9, config.hidden_size)
+        
+        self.last_layer = nn.Linear(config.hidden_size, classes)
+
+    def reinit(self, config):
+        self.dropout = nn.Dropout(config["hyperparameters"]["hidden_dropout_prob"])
+
+    def forward(self, batch):
+        _, pooled_output = self.roberta(batch.text)
+
+        used_features = [
+            batch.hasqmark,
+            batch.hasemark,
+            batch.hashashtag,
+            batch.hasurl,
+            batch.haspic,
+            batch.hasnegation,
+            batch.hasswearwords,
+            batch.src_rumour,
+            batch.thread_rumour#,
+            # batch.spacy_processed_NERvec
+        ]
+        features = cat(tuple([f.unsqueeze(-1) for f in used_features]), dim=-1)
+
+        pooled_output = self.dropout(cat((pooled_output, features), 1))
+
+        outp_with_features = F.relu(self.dropout(self.hidden_layer(pooled_output)))
+
+        logits = self.last_layer(outp_with_features)
+        return logits
+
+class GPT2ModelForStanceClassification(GPT2Model):
 
     def __init__(self, config, classes=4):
         super(GPT2ModelForStanceClassification, self).__init__()
