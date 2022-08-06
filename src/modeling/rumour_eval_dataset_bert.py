@@ -69,7 +69,10 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
 
                 segment_ids = [0] * (len(segment_A) + 2) + [1] * (len(segment_B) + 1)
                 input_mask = [1] * len(segment_ids)
-                
+
+                # Number of NER entities
+                NER_entities = len([i for i in example['spacy_processed_NERvec'] if i>0])
+
                 # Create sentiment analysis for the raw data
                 sentiment_analyser = SentimentIntensityAnalyzer()
                 sentiment = sentiment_analyser.polarity_scores(example["raw_text"])
@@ -101,8 +104,8 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
                         example['hasnegation'],
                         example['hasswearwords'],
                         example['src_rumour'],
-                        example['thread_rumour']#,
-                        # example['spacy_processed_NERvec']
+                        example['thread_rumour'],
+                        NER_entities
                     ]
 
                 examples.append(Example.fromlist(example_list, fields))
@@ -141,8 +144,8 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
                 ('hasnegation', float_field()),
                 ('hasswearwords', float_field()),
                 ('src_rumour', float_field()),
-                ('thread_rumour', float_field())#,
-                #('spacy_processed_NERvec', tt.data.Field(use_vocab=False, dtype=torch.float, batch_first=True, pad_token=0))
+                ('thread_rumour', float_field()),
+                ('NER_entities', float_field())
             ]
         return fields
 
