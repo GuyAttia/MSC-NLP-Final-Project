@@ -68,7 +68,7 @@ class RoBertaWFeaturesModelForStanceClassification(RobertaModel):
         
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.hidden_layer = nn.Linear(config.hidden_size + 10, config.hidden_size)
+        self.hidden_layer = nn.Linear(config.hidden_size + 19, config.hidden_size)
         
         self.last_layer = nn.Linear(config.hidden_size, classes)
 
@@ -88,7 +88,16 @@ class RoBertaWFeaturesModelForStanceClassification(RobertaModel):
             batch.hasswearwords,
             batch.src_rumour,
             batch.thread_rumour,
-            batch.NER_entities
+            batch.NER_entities,
+            batch.sentiment_raw_pos,
+            batch.sentiment_raw_neu,
+            batch.sentiment_raw_neg,
+            batch.sentiment_src_pos,
+            batch.sentiment_src_neu,
+            batch.sentiment_src_neg,
+            batch.sentiment_prev_pos,
+            batch.sentiment_prev_neu,
+            batch.sentiment_prev_neg
         ]
         features = cat(tuple([f.unsqueeze(-1) for f in used_features]), dim=-1)
 

@@ -75,7 +75,9 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
 
                 # Create sentiment analysis for the raw data
                 sentiment_analyser = SentimentIntensityAnalyzer()
-                sentiment = sentiment_analyser.polarity_scores(example["raw_text"])
+                sentiment_raw = sentiment_analyser.polarity_scores(example["raw_text"])
+                sentiment_src = sentiment_analyser.polarity_scores(example["raw_text_src"])
+                sentiment_prev = sentiment_analyser.polarity_scores(example["raw_text_prev"])
 
                 # Build the example with all the relevant features
                 example_list = [
@@ -85,9 +87,15 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
                     example["stance_label"], # stance_label
                     "\n-----------\n".join([example["raw_text_src"], example["raw_text_prev"], example["raw_text"]]),  # raw_text
                     example["issource"],  # issource
-                    sentiment["pos"],  # sentiment_pos
-                    sentiment["neu"],  # sentiment_neu
-                    sentiment["neg"]    # sentiment_neg
+                    sentiment_raw["pos"],  # sentiment_raw_pos
+                    sentiment_raw["neu"],  # sentiment_raw_neu
+                    sentiment_raw["neg"],    # sentiment_raw_neg
+                    sentiment_src["pos"],  # sentiment_src_pos
+                    sentiment_src["neu"],  # sentiment_src_neu
+                    sentiment_src["neg"],    # sentiment_src_neg
+                    sentiment_prev["pos"],  # sentiment_prev_pos
+                    sentiment_prev["neu"],  # sentiment_prev_neu
+                    sentiment_prev["neg"]    # sentiment_prev_neg
                 ] + [
                     text_ids,   # text
                     segment_ids, # type_mask
@@ -126,9 +134,15 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
             ('stance_label', tt.data.Field(sequential=False, use_vocab=False, batch_first=True, is_target=True)),
             ('raw_text', tt.data.RawField()),
             ('issource', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
-            ('sentiment_pos', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
-            ('sentiment_neu', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
-            ('sentiment_neg', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
+            ('sentiment_raw_pos', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
+            ('sentiment_raw_neu', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
+            ('sentiment_raw_neg', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
+            ('sentiment_src_pos', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
+            ('sentiment_src_neu', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
+            ('sentiment_src_neg', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
+            ('sentiment_prev_pos', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
+            ('sentiment_prev_neu', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
+            ('sentiment_prev_neg', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
             ('text', text_field()),
             ('type_mask', text_field()),
             ('input_mask', text_field())
