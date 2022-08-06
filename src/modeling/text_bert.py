@@ -1,6 +1,7 @@
 from pytorch_pretrained_bert import BertModel
 from pytorch_transformers import RobertaModel
-from transformers import GPT2Model
+from transformers import GPT2Model, GPT2LMHeadModel, PretrainedConfig
+from transformers import GPT2Model, GPT2Config
 from pytorch_pretrained_bert.modeling import BertPreTrainedModel
 from torch import nn
 
@@ -63,11 +64,11 @@ class RoBertaModelForStanceClassification(RobertaModel):
         logits = self.last_layer(pooled_output)
         return logits
 
-class GPT2ModelForStanceClassification(GPT2Model):
+class GPT2ModelForStanceClassification(nn.Module):
 
     def __init__(self, config, classes=4):
-        super(GPT2ModelForStanceClassification, self).__init__(config)
-        self.gpt2 = GPT2Model(config)
+        super(GPT2ModelForStanceClassification, self).__init__()
+        self.gpt2 = GPT2Model.from_pretrained('gpt2')
         self.last_layer = nn.Linear(config.hidden_size, classes)
         # self.apply(self.init_weights)
         self.dropout = nn.Dropout(config.output_hidden_states)
@@ -76,8 +77,11 @@ class GPT2ModelForStanceClassification(GPT2Model):
         self.dropout = nn.Dropout(config["hyperparameters"]["hidden_dropout_prob"])
 
     def forward(self, batch):
-        gpt_out, pooled_output = self.gpt2(batch.text)
+        gpt_out, pooled_output = self.gpt2(batch.text).logits
         batch_size = gpt_out.shape[0]
         # pooled_output = self.dropout(pooled_output.last_hidden_state[0])
         logits = self.last_layer(gpt_out.view(batch_size,-1))
         return logits
+
+    # def from_pretrained(self, config):
+    #     self.gpt2 = GPT2LMHeadModel.from_pretrained(config)

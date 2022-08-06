@@ -2,11 +2,12 @@ import math
 import torch
 import torch.nn.functional as F
 from pytorch_pretrained_bert import BertAdam, BertTokenizer
-from transformers import RobertaTokenizer, GPT2Tokenizer
-
+from transformers import RobertaTokenizer, GPT2Tokenizer, GPT2ForSequenceClassification
+from transformers import GPT2Config
 
 from sklearn import metrics
 from torch.nn.modules.loss import _Loss
+from torch.optim import AdamW
 from torchtext.data import BucketIterator, Iterator
 
 from modeling.rumour_eval_dataset_bert import RumourEval2019Dataset_BERTTriplets
@@ -74,11 +75,16 @@ class BERT_Framework:
         train_iter, dev_iter, test_iter, weights = self.create_dataset_iterators()
 
         if lr:
-            optimizer = BertAdam(filter(lambda p: p.requires_grad, self.model.parameters()),
-                             lr=lr)
+            if config['variant'] == "bert-large-uncased" or config['variant'] == "roberta-large":
+                optimizer = BertAdam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=lr)
+            if config['variant'] == "gpt2":
+                optimizer =  AdamW(self.model.parameters(), lr = 2e-5, eps = 1e-8)
         else:
-            optimizer = BertAdam(filter(lambda p: p.requires_grad, self.model.parameters()),
-                             lr=config["hyperparameters"]["learning_rate"])
+            if config['variant'] == "bert-large-uncased" or config['variant'] == "roberta-large":
+                optimizer = BertAdam(filter(lambda p: p.requires_grad, self.model.parameters()),
+                                            lr=config["hyperparameters"]["learning_rate"])
+            if config['variant'] == "gpt2":
+                optimizer =  AdamW(self.model.parameters(), lr = 2e-5, eps = 1e-8)
         lossfunction = torch.nn.CrossEntropyLoss(weight=weights.to(self.device))
 
         for epoch in range(config["hyperparameters"]["epochs"]):
@@ -128,10 +134,10 @@ class BERT_Framework:
                 break
             
         if config["plot_res"] == "True":
-            plot_array_values_against_length([train_losses, validation_losses, test_losses], "Loss vs Epochs")
-            plot_array_values_against_length([train_accuracies, validation_accuracies, test_accuracies], "Accuracy vs Epochs")
-            plot_array_values_against_length([train_F1s_global, validation_F1s_global, test_F1s_global], "Global F1 score vs Epochs")
-            plot_array_values_against_length([train_F1s_weighted, validation_F1s_weighted, test_F1s_weighted], "Weighted F1 score vs Epochs")
+            plot_array_values_against_length([train_losses, validation_losses, test_losses], f"Loss vs Epochs {config['variant']}")
+            plot_array_values_against_length([train_accuracies, validation_accuracies, test_accuracies], f"Accuracy vs Epochs {config['variant']}")
+            plot_array_values_against_length([train_F1s_global, validation_F1s_global, test_F1s_global], f"Global F1 score vs Epochs {config['variant']}")
+            plot_array_values_against_length([train_F1s_weighted, validation_F1s_weighted, test_F1s_weighted], f"Weighted F1 score vs Epochs {config['variant']}")
             #plot_confusion_matrix(self.total_labels, self.total_preds)
 
     def train(self, model: torch.nn.Module, lossfunction: _Loss, optimizer: torch.optim.Optimizer,
@@ -152,9 +158,14 @@ class BERT_Framework:
         optimizer.zero_grad()
         for i, batch in enumerate(train_iter):
             updated = False
-            pred_logits = model(batch)
-            _, argmaxpreds = torch.max(F.softmax(pred_logits, -1), dim=1)
-            loss = lossfunction(pred_logits, batch.stance_label) / update_ratio
+            if config['variant'] == "bert-large-uncased" or config['variant'] == "roberta-large":
+                pred_logits = model(batch)
+                _, argmaxpreds = torch.max(F.softmax(pred_logits, -1), dim=1)
+                loss = lossfunction(pred_logits, batch.stance_label) / update_ratio
+            if config['variant'] == "gpt2":
+                pred_logits = model(batch.text)
+                _, argmaxpreds = torch.max(F.softmax(pred_logits.logits, -1), dim=1)
+                loss = lossfunction(pred_logits.logits, batch.stance_label) / update_ratio
             loss.backward()
 
             if (i + 1) % update_ratio == 0:
@@ -166,7 +177,7 @@ class BERT_Framework:
             train_loss += loss.item()
             N += 1 if not hasattr(lossfunction, "weight") \
                 else sum([lossfunction.weight[k].item() for k in batch.stance_label])
-            total_correct += self.calculate_correct(pred_logits, batch.stance_label)
+            total_correct += self.calculate_correct(pred_logits, batch.stance_label, config=config)
             examples_so_far += len(batch.stance_label)
             self.total_preds += list(argmaxpreds.cpu().numpy())
             self.total_labels += list(batch.stance_label.cpu().numpy())
@@ -199,15 +210,20 @@ class BERT_Framework:
         total_preds = []
 
         for _, batch in enumerate(dev_iter):
-            pred_logits = model(batch)
-            loss = lossfunction(pred_logits, batch.stance_label)
-            _, argmaxpreds = torch.max(F.softmax(pred_logits, -1), dim=1)
+            if config['variant'] == "bert-large-uncased" or config['variant'] == "roberta-large":
+                pred_logits = model(batch)
+                loss = lossfunction(pred_logits, batch.stance_label)
+                _, argmaxpreds = torch.max(F.softmax(pred_logits, -1), dim=1)
+            if config['variant'] == "gpt2":
+                pred_logits = model(batch.text)
+                loss = lossfunction(pred_logits.logits, batch.stance_label)
+                _, argmaxpreds = torch.max(F.softmax(pred_logits.logits, -1), dim=1)
 
             # compute branch statistics
             branch_levels = [id.split(".", 1)[-1] for id in batch.branch_id]
 
             # compute correct and correct per branch depth
-            correct, correct_per_level = self.calculate_correct(pred_logits, batch.stance_label, levels=branch_levels)
+            correct, correct_per_level = self.calculate_correct(pred_logits, batch.stance_label, levels=branch_levels, config=config)
             total_correct += correct
             total_correct_per_level += correct_per_level
             examples_so_far += len(batch.stance_label)
@@ -226,8 +242,11 @@ class BERT_Framework:
             model.train()
         return loss, accuracy, F1_global, F1_weighted
 
-    def calculate_correct(self, pred_logits: torch.Tensor, labels: torch.Tensor, levels=None):
-        preds = torch.argmax(pred_logits, dim=1)
+    def calculate_correct(self, pred_logits: torch.Tensor, labels: torch.Tensor, levels=None, config:dict=None):
+        if config['variant'] == "bert-large-uncased" or config['variant'] == "roberta-large":
+            preds = torch.argmax(pred_logits, dim=1)
+        if config['variant'] == "gpt2":
+            preds = torch.argmax(pred_logits.logits, dim=1)
         correct_vec = preds == labels
         if not levels:
             return torch.sum(correct_vec).item()
@@ -253,11 +272,18 @@ class RoBERTa_Framework(BERT_Framework):
 class GPT2_Framework(BERT_Framework):
     def __init__(self, config: dict, modelfunc):
         super(GPT2_Framework, self).__init__(config, modelfunc)
-        self.config = config        
-        self.modelfunc = modelfunc
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.init_tokenizer()
 
     def init_tokenizer(self):
+        model_config = GPT2Config.from_pretrained(pretrained_model_name_or_path='gpt2', num_labels=4)
         self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-        self.model = self.modelfunc.from_pretrained('gpt2').to(self.device)
+        # default to left padding
+        self.tokenizer.padding_side = "left"
+        # Define PAD Token = EOS Token = 50256
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.model = GPT2ForSequenceClassification.from_pretrained(pretrained_model_name_or_path='gpt2', config=model_config).to(self.device) 
+        self.model.resize_token_embeddings(len(self.tokenizer))
+
+        # fix model padding token id
+        self.model.config.pad_token_id = self.model.config.eos_token_id
