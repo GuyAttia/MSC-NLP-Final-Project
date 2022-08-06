@@ -9,7 +9,7 @@ def plot_array_values_against_length(arr: list, title: str=''):
     ax.plot(arr[0]) # train
     ax.plot(arr[1]) # validation
     ax.plot(arr[2]) # test
-    fig.savefig(f"plots/{title}.png")
+    fig.savefig(f"../plots/{title}.png")
     plt.show()
 
 def plot_confusion_matrix(y_actu, y_pred, title='Confusion Matrix'):
@@ -23,5 +23,5 @@ def plot_confusion_matrix(y_actu, y_pred, title='Confusion Matrix'):
     plt.yticks(df_confusion.index, labels=['support',  'comment', 'deny', 'query'])
     plt.ylabel(df_confusion.index.name)
     plt.xlabel(df_confusion.columns.name)
-    plt.savefig(f"plots/confusion_matrix.png")
+    plt.savefig(f"../plots/confusion_matrix.png")
 

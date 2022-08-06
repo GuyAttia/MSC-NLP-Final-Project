@@ -16,3 +16,5 @@ pyaml
 pytorch_pretrained_bert
 torchtext==0.4.0
 vaderSentiment
+transformers
+pytorch_transformers
