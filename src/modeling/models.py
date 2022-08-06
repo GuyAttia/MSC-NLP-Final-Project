@@ -68,9 +68,12 @@ class RoBertaWFeaturesModelForStanceClassification(RobertaModel):
         
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.hidden_layer = nn.Linear(config.hidden_size + 19, config.hidden_size)
+        self.hidden_layer = nn.Linear(config.hidden_size + 9, 1024)
+        self.hidden_layer2 = nn.Linear(1024 + 1, 512)
+        self.hidden_layer3 = nn.Linear(512 + 9, 256)
+        self.hidden_layer4 = nn.Linear(256, 64)
         
-        self.last_layer = nn.Linear(config.hidden_size, classes)
+        self.last_layer = nn.Linear(64, classes)
 
     def reinit(self, config):
         self.dropout = nn.Dropout(config["hyperparameters"]["hidden_dropout_prob"])
@@ -78,7 +81,7 @@ class RoBertaWFeaturesModelForStanceClassification(RobertaModel):
     def forward(self, batch):
         _, pooled_output = self.roberta(batch.text)
 
-        used_features = [
+        first_features = [
             batch.hasqmark,
             batch.hasemark,
             batch.hashashtag,
@@ -87,8 +90,14 @@ class RoBertaWFeaturesModelForStanceClassification(RobertaModel):
             batch.hasnegation,
             batch.hasswearwords,
             batch.src_rumour,
-            batch.thread_rumour,
-            batch.NER_entities,
+            batch.thread_rumour
+        ]
+
+        second_features = [
+            batch.NER_entities
+        ]
+
+        last_features = [
             batch.sentiment_raw_pos,
             batch.sentiment_raw_neu,
             batch.sentiment_raw_neg,
@@ -99,13 +108,22 @@ class RoBertaWFeaturesModelForStanceClassification(RobertaModel):
             batch.sentiment_prev_neu,
             batch.sentiment_prev_neg
         ]
-        features = cat(tuple([f.unsqueeze(-1) for f in used_features]), dim=-1)
+        first_features_tensor = cat(tuple([f.unsqueeze(-1) for f in first_features]), dim=-1)
+        second_features_tensor = cat(tuple([f.unsqueeze(-1) for f in second_features]), dim=-1)
+        last_features_tensor = cat(tuple([f.unsqueeze(-1) for f in last_features]), dim=-1)
 
-        pooled_output = self.dropout(cat((pooled_output, features), 1))
+        pooled_output = cat((pooled_output, first_features_tensor), 1)
+        pooled_output = F.relu(self.dropout(self.hidden_layer(pooled_output)))
+        
+        pooled_output = cat((pooled_output, second_features_tensor), 1)
+        pooled_output = F.relu(self.dropout(self.hidden_layer2(pooled_output)))
 
-        outp_with_features = F.relu(self.dropout(self.hidden_layer(pooled_output)))
+        pooled_output = cat((pooled_output, last_features_tensor), 1)
+        pooled_output = F.relu(self.dropout(self.hidden_layer3(pooled_output)))
 
-        logits = self.last_layer(outp_with_features)
+        pooled_output = F.relu(self.dropout(self.hidden_layer4(pooled_output)))
+
+        logits = self.last_layer(pooled_output)
         return logits
 
 class GPT2ModelForStanceClassification(GPT2Model):
