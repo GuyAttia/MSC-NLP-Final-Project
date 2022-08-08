@@ -13,7 +13,7 @@ from typing import Tuple, List
 from modeling.rumour_eval_dataset_bert import RumourEval2019Dataset_BERTTriplets
 from plot_results import plot_array_values_against_length, plot_confusion_matrix
 
-MAX_EXAMPLES = 5  # Todo: Change into None for full run
+MAX_EXAMPLES = None  # Todo: Change into None for full run
 
 def get_class_weights(examples: Iterable, label_field_name: str, classes: int) -> torch.FloatTensor:
     """
