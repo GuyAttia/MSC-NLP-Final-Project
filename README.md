@@ -26,12 +26,15 @@ There are two environments that you can run this project scripts through: local 
 ### Google Colab
 1. Copy this entire repository into your Google Drive (including the data folder)
 2. Open the "run_project.ipynb" notebook that you can find in the root folder of this Repo.
-3. Run cells.
+3. Change the hard-coded Drive path to this folder (second code cell)
+4. Run cells
+** Note that for this example we changed the maximum number of epochs to be 2
 
 ## Relevant Scripts
 There are two main scripts you have to run:
 1. data processing: `python src/data_processing.py`. 
-The preprocessed data (output) should be available in data_preprocessing/saved_data_RumEval2019
+The preprocessed data (output) should be available in data_preprocessing/saved_data_RumEval2019.
+** Notice that this script is taking a long time to run due to the large processing of the data.
 2. Run a model: `python src/run_model.py -m {model_name}`. You need to provide the script the name of the model you want to run.
 Valid options are:
     - baseline - our baseline - BERT

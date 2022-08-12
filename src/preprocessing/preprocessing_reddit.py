@@ -3,8 +3,8 @@ import os
 
 from preprocessing.tree2branches import tree2branches
 
-TRAIN_DATA_PREFIX = "/nlp/data/rumoureval2019/rumoureval-2019-training-data"
-PATH_TO_TEST_REDDIT= "/nlp/data/rumoureval2019/rumoureval-2019-test-data/reddit-test-data"
+TRAIN_DATA_PREFIX = "data/rumoureval2019/rumoureval-2019-training-data"
+PATH_TO_TEST_REDDIT= "data/rumoureval2019/rumoureval-2019-test-data/reddit-test-data"
 
 def listdir_nohidden(path):
     contents = os.listdir(path)
@@ -14,7 +14,7 @@ def listdir_nohidden(path):
 
 
 def load_test_data_reddit(path = PATH_TO_TEST_REDDIT):
-    path_test = os.path.join("/nlp/data/rumoureval2019/rumoureval-2019-test-data", "test-key.json")
+    path_test = os.path.join("data/rumoureval2019/rumoureval-2019-test-data", "test-key.json")
     with open(path_test, 'r') as f:
         test_key = json.load(f)
     test = test_key['subtaskaenglish']

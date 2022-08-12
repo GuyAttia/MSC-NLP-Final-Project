@@ -86,7 +86,7 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
                     example["tweet_id"], # tweet_id
                     example["stance_label"], # stance_label
                     "\n-----------\n".join([example["raw_text_src"], example["raw_text_prev"], example["raw_text"]]),  # raw_text
-                    example["issource"]  # issource
+                    example["issource"],  # issource
                     # sentiment_raw["pos"],  # sentiment_raw_pos
                     # sentiment_raw["neu"],  # sentiment_raw_neu
                     # sentiment_raw["neg"],    # sentiment_raw_neg
@@ -96,7 +96,6 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
                     # sentiment_prev["pos"],  # sentiment_prev_pos
                     # sentiment_prev["neu"],  # sentiment_prev_neu
                     # sentiment_prev["neg"]    # sentiment_prev_neg
-                ] + [
                     text_ids,   # text
                     segment_ids, # type_mask
                     input_mask  # input_mask
@@ -133,7 +132,7 @@ class RumourEval2019Dataset_BERTTriplets(tt.data.Dataset):
             ('tweet_id', tt.data.RawField()),
             ('stance_label', tt.data.Field(sequential=False, use_vocab=False, batch_first=True, is_target=True)),
             ('raw_text', tt.data.RawField()),
-            ('issource', tt.data.Field(use_vocab=False, batch_first=True, sequential=False))
+            ('issource', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
             # ('sentiment_raw_pos', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
             # ('sentiment_raw_neu', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
             # ('sentiment_raw_neg', tt.data.Field(use_vocab=False, batch_first=True, sequential=False)),
